@@ -1,4 +1,4 @@
-project(VirtuOS LANGUAGES C)
+project(VirtuOS)
 cmake_minimum_required(VERSION 2.8)
 
 #add_library(thr_example ../src/thread.h example.c)
