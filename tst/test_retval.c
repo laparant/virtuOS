@@ -16,7 +16,15 @@ int tst__init_retval() {
   return EXIT_FAILURE;
 }
 
-//TODO find a test for free
+//TODO find a real test for free
+int tst__free_retval() {
+  struct retval *rv = NULL;
+  rv = init_retval();
+  //printf("%p\n", rv);
+  free_retval(rv);
+  //printf("%p\n", rv);
+  return (rv == NULL)? EXIT_SUCCESS: EXIT_FAILURE;
+}
 
 int tst__inc_counter() {
   struct retval * rv = init_retval();
@@ -46,10 +54,23 @@ int tst__dec_counter() {
   return EXIT_SUCCESS;
 }
 
+int tst__get_value() {
+  struct retval * rv = init_retval();
+  int *i;
+  rv->value = i;
+  if(i == rv->value) {
+    free_retval(rv);
+    return EXIT_SUCCESS;
+  }
+  free_retval(rv);
+  return EXIT_FAILURE;
+}
+
 int main() {
   assert((tst__init_retval() == EXIT_SUCCESS) && "test init_retval failed\n");
   assert((tst__inc_counter() == EXIT_SUCCESS) && "test inc_counter failed\n");
   assert((tst__dec_counter() == EXIT_SUCCESS) && "test dec_counter failed\n");
-
+  //assert((tst__free_retval() == EXIT_SUCCESS) && "test free_retval failed\n");
+  assert((tst__get_value() == EXIT_SUCCESS) && "test get_value failed\n");
   return 0;
 }
