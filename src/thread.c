@@ -2,6 +2,7 @@
 #include <ucontext.h>
 
 #include "thread.h"
+#include "retval.h"
 #include "queue.h"
 
 typedef struct thread

@@ -3,9 +3,11 @@ cmake_minimum_required(VERSION 2.8)
 
 set(HDRS
     thread.h
-    queue.h)
+    queue.h
+    retval.h)
 
 set(SRCS
-    thread.c)
+    thread.c
+    retval.c)
 
 add_library(thread ${HDRS} ${SRCS})
