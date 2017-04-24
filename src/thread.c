@@ -24,21 +24,17 @@ typedef struct thread
 static thread g_current_thread;
 
 /* The list of all the threads that were created */
-STAILQ_HEAD(thread_list, thread);
-static struct thread_list *g_all_threads = STAILQ_HEAD_INITIALIZER(*g_all_threads);
+static STAILQ_HEAD(thread_list_all, thread) g_all_threads;
 
 /* The run queue */
-static struct thread_list *g_runq = STAILQ_HEAD_INITIALIZER(*g_runq);
+static STAILQ_HEAD(thread_list_run, thread) g_runq;
 
 typedef struct thread_base
 {
-    struct thread_list *sleepq;
+    STAILQ_HEAD(thread_list_sleep, thread) sleepq;
     struct retval *rv;
     ucontext_t *ctx;
 } thread_base;
-
-
-
 
 thread_t thread_self(void)
 {
@@ -53,16 +49,6 @@ void force_exit(void *(*func)(void *), void *funcarg)
 
 int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 {
-    /* First thread will initialize all_threads and runqueue */
-    if (STAILQ_EMPTY(g_all_threads))
-    {
-        STAILQ_INIT(g_all_threads);
-    }
-    if (STAILQ_EMPTY(g_runq))
-    {
-        STAILQ_INIT(g_runq);
-    }
-
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
     CHECK(th, NULL, "thread_create: thread pointer malloc")
@@ -81,11 +67,11 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     th->addr->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    STAILQ_INIT(th->addr->sleepq);
+    STAILQ_INIT(&(th->addr->sleepq));
 
     /* Insert the current thread in the run queue the list of all the threads */
-    STAILQ_INSERT_TAIL(g_runq, th, entries);
-    STAILQ_INSERT_TAIL(g_all_threads, th, entries);
+    STAILQ_INSERT_TAIL(&g_runq, th, entries);
+    STAILQ_INSERT_TAIL(&g_all_threads, th, entries);
     *newthread = th;
 
     return SUCCESS;
@@ -94,10 +80,10 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 int thread_yield(void)
 {
 
-    STAILQ_INSERT_TAIL(g_runq, &g_current_thread, entries);
-    thread *new_current = STAILQ_FIRST(g_runq);
+    STAILQ_INSERT_TAIL(&g_runq, &g_current_thread, entries);
+    thread *new_current = STAILQ_FIRST(&g_runq);
 
-    STAILQ_REMOVE_HEAD(g_runq, entries);
+    STAILQ_REMOVE_HEAD(&g_runq, entries);
 
     CHECK(swapcontext(g_current_thread.addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
     g_current_thread = *new_current;
@@ -110,5 +96,37 @@ int thread_join(thread_t thread, void **retval)
 
 void thread_exit(void *retval)
 {
+}
 
+/*#############################################################################################*/
+
+__attribute__ ((constructor)) void first_thread (void)
+{
+    /* Initialization of the current thread */
+    /* Initialization of the context */
+    thread *th = malloc(sizeof(thread));
+    //CHECK(th, NULL, "thread_create: thread pointer malloc")
+    th->addr = malloc(sizeof(thread_base));
+    //CHECK(th->addr, NULL, "thread_create: thread_base malloc")
+    th->addr->ctx = malloc(sizeof(ucontext_t));
+    //CHECK(th->addr->ctx, NULL, "thread_create: context malloc")
+    getcontext(th->addr->ctx);
+
+    th->addr->ctx->uc_stack.ss_size = 64 * 1024;
+    th->addr->ctx->uc_stack.ss_sp = malloc(th->addr->ctx->uc_stack.ss_size);
+    th->addr->ctx->uc_link = NULL;
+    makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, NULL, NULL);
+
+    /* Get the return value */
+    th->addr->rv = init_retval();
+
+    /* Initialize the thread's sleep queue */
+    STAILQ_INIT(&(th->addr->sleepq));
+
+    /* Initializing the current thread */
+    g_current_thread = *th;
+
+    /* Initialization of the queues */
+    STAILQ_INIT(&g_all_threads);
+    STAILQ_INIT(&g_runq);
 }
