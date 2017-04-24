@@ -10,7 +10,7 @@
 #define SUCCESS 0
 #define FAILURE -1
 
-#define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); return FAILURE;}
+#define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
 typedef struct thread_base thread_base;
 
@@ -21,7 +21,7 @@ typedef struct thread
 } thread;
 
 /* The thread that is currently being executed */
-static thread g_current_thread;
+static thread * g_current_thread;
 
 /* The list of all the threads that were created */
 static STAILQ_HEAD(thread_list_all, thread) g_all_threads;
@@ -38,7 +38,7 @@ typedef struct thread_base
 
 thread_t thread_self(void)
 {
-    return g_current_thread.addr;
+    return g_current_thread->addr;
 }
 
 void force_exit(void *(*func)(void *), void *funcarg)
@@ -79,14 +79,15 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 
 int thread_yield(void)
 {
-
-    STAILQ_INSERT_TAIL(&g_runq, &g_current_thread, entries);
+    STAILQ_INSERT_TAIL(&g_runq, g_current_thread, entries);
     thread *new_current = STAILQ_FIRST(&g_runq);
 
     STAILQ_REMOVE_HEAD(&g_runq, entries);
 
-    CHECK(swapcontext(g_current_thread.addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
-    g_current_thread = *new_current;
+    CHECK(swapcontext(g_current_thread->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+    g_current_thread = new_current;
+
+    return EXIT_SUCCESS;
 }
 
 int thread_join(thread_t thread, void **retval)
@@ -105,11 +106,11 @@ __attribute__ ((constructor)) void first_thread (void)
     /* Initialization of the current thread */
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
-    //CHECK(th, NULL, "thread_create: thread pointer malloc")
+    CHECK(th, NULL, "thread_create: thread pointer malloc")
     th->addr = malloc(sizeof(thread_base));
-    //CHECK(th->addr, NULL, "thread_create: thread_base malloc")
+    CHECK(th->addr, NULL, "thread_create: thread_base malloc")
     th->addr->ctx = malloc(sizeof(ucontext_t));
-    //CHECK(th->addr->ctx, NULL, "thread_create: context malloc")
+    CHECK(th->addr->ctx, NULL, "thread_create: context malloc")
     getcontext(th->addr->ctx);
 
     th->addr->ctx->uc_stack.ss_size = 64 * 1024;
@@ -124,9 +125,42 @@ __attribute__ ((constructor)) void first_thread (void)
     STAILQ_INIT(&(th->addr->sleepq));
 
     /* Initializing the current thread */
-    g_current_thread = *th;
+    g_current_thread = th;
 
     /* Initialization of the queues */
     STAILQ_INIT(&g_all_threads);
     STAILQ_INIT(&g_runq);
+}
+
+__attribute__ ((destructor)) void cleaner (void)
+{
+    thread * th;
+
+    /* Free g_all_threads */
+    STAILQ_FOREACH(th, &g_all_threads, entries)
+    {
+        free(th->addr->ctx->uc_stack.ss_sp);
+        free(th->addr->ctx);
+        free_retval(th->addr->rv);
+        free(th->addr);
+        free(th);
+    }
+
+    /* Free g_runq */
+    STAILQ_FOREACH(th, &g_runq, entries)
+    {
+        free(th->addr->ctx->uc_stack.ss_sp);
+        free(th->addr->ctx);
+        free_retval(th->addr->rv);
+        free(th->addr);
+        free(th);
+    }
+
+    /* Free the current thread */
+    th=g_current_thread;
+    free(th->addr->ctx->uc_stack.ss_sp);
+    free(th->addr->ctx);
+    free_retval(th->addr->rv);
+    free(th->addr);
+    free(th);
 }
