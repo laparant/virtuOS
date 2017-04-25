@@ -101,7 +101,13 @@ int thread_join(thread_t thread, void **retval)
     STAILQ_INSERT_TAIL(&(th->addr->sleepq),(struct thread *) thread_self(),entries);
 
     /* Sleeping while the thread hasn't finished */
-    thread_yield();
+    struct thread *new_current = STAILQ_FIRST(&g_runq);
+
+    STAILQ_REMOVE_HEAD(&g_runq, entries);
+
+    struct thread * tmp = g_current_thread;
+    g_current_thread = new_current;
+    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
     /* Collecting the value of retval */
     if(retval) *retval = get_value(th->addr->rv);
