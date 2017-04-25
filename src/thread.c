@@ -74,7 +74,7 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     /* Insert the current thread in the run queue the list of all the threads */
     STAILQ_INSERT_TAIL(&g_runq, th, entries);
     STAILQ_INSERT_TAIL(&g_all_threads, th, entries);
-    *newthread = th;
+    *newthread = (thread_t) th;
 
     return EXIT_SUCCESS;
 }
@@ -86,8 +86,9 @@ int thread_yield(void)
 
     STAILQ_REMOVE_HEAD(&g_runq, entries);
 
-    CHECK(swapcontext(g_current_thread->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+    thread * tmp = g_current_thread;
     g_current_thread = new_current;
+    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
     return EXIT_SUCCESS;
 }
@@ -125,17 +126,17 @@ void thread_exit(void *retval)
 
     /* Free the ressources */
     VALGRIND_STACK_DEREGISTER(me->addr->valgrind_stackid);
-    free(me->addr->ctx->uc_stack.ss_sp);
-    free(me->addr->ctx);
-    free(me->addr);
-    free(me);
+    //free(me->addr->ctx->uc_stack.ss_sp);
+    //free(me->addr->ctx);
+    //free(me->addr);
+    //free(me);
 
     /* Yielding and leaving the runqueue */
-    thread * new_current = STAILQ_FIRST(&g_runq);
+    thread *new_current = STAILQ_FIRST(&g_runq);
+    g_current_thread = new_current;
     STAILQ_REMOVE_HEAD(&g_runq, entries);
 
-    CHECK(setcontext(new_current->addr->ctx), -1, "thread_exit: setcontext")
-    g_current_thread = new_current;
+    CHECK(setcontext(g_current_thread->addr->ctx), -1, "thread_exit: setcontext")
 }
 
 /*#############################################################################################*/
