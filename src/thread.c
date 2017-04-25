@@ -126,8 +126,8 @@ void thread_exit(void *retval)
 
     /* Free the ressources */
     VALGRIND_STACK_DEREGISTER(me->addr->valgrind_stackid);
-    //free(me->addr->ctx->uc_stack.ss_sp);
-    //free(me->addr->ctx);
+    free(me->addr->ctx->uc_stack.ss_sp);
+    free(me->addr->ctx);
     //free(me->addr);
     //free(me);
 
@@ -178,6 +178,13 @@ __attribute__ ((constructor)) void first_thread (void)
 __attribute__ ((destructor)) void cleaner (void)
 {
     thread * th;
+
+    /* Free the threads in the runqueue */
+    STAILQ_FOREACH(th, &g_runq, entries)
+    {
+        free(th->addr);
+        free(th);
+    }
 
     /* Free the current thread */
     th=g_current_thread;
