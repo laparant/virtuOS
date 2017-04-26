@@ -104,9 +104,8 @@ int thread_join(thread_t thread, void **retval)
     if(th->addr->exited)
     {
         if(retval) *retval = get_value(th->addr->rv);
+        return EXIT_SUCCESS;
     }
-
-    return EXIT_SUCCESS;
 
     /* If the thread is alive */
     inc_counter(th->addr->rv);
@@ -132,6 +131,7 @@ void thread_exit(void *retval)
 {
     thread * th;
     thread * me = (thread *) thread_self();
+    me->addr->exited = 1;
 
     /* Set the retval */
     if(retval) me->addr->rv->value = retval;
@@ -141,13 +141,6 @@ void thread_exit(void *retval)
     {
         STAILQ_INSERT_TAIL(&g_runq, th, entries);
     }
-
-    /* Free the ressources */
-    VALGRIND_STACK_DEREGISTER(me->addr->valgrind_stackid);
-    free(me->addr->ctx->uc_stack.ss_sp);
-    free(me->addr->ctx);
-    //free(me->addr);
-    //free(me);
 
     /* Yielding and leaving the runqueue */
     thread *new_current = STAILQ_FIRST(&g_runq);
@@ -160,7 +153,7 @@ void thread_exit(void *retval)
 /*#############################################################################################*/
 
 __attribute__ ((constructor)) void thread_create_main (void)
-{
+{   
     /* Initialization of the current thread */
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
@@ -209,4 +202,13 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     /* Yield to let other threads continue */
 
     /* Clean everything */
+}
+
+/* Clean the process exiting */
+void free_resources(thread * th)
+{
+    /* Free the resources */
+    VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
+    free(th->addr->ctx->uc_stack.ss_sp);
+    free(th->addr->ctx);
 }
