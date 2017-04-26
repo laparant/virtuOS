@@ -3,8 +3,8 @@
 
 #ifndef USE_PTHREAD
 
-__attribute__ ((constructor)) void frist_thread (void);
-__attribute__ ((destructor)) void cleaner (void);
+__attribute__ ((constructor)) void thread_create_main (void);
+__attribute__ ((destructor)) void thread_exit_main (void);
 
 /* identifiant de thread
  * NB: pourra être un entier au lieu d'un pointeur si ca vous arrange,

@@ -33,6 +33,7 @@ typedef struct thread_base
     struct retval *rv;
     ucontext_t *ctx;
     int valgrind_stackid;
+    int exited;
 } thread_base;
 
 thread_t thread_self(void)
@@ -62,6 +63,7 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
+    th->addr->exited = 0;
     th->addr->ctx->uc_link = NULL;
     makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, func, funcarg);
 
@@ -97,6 +99,16 @@ int thread_join(thread_t thread, void **retval)
 {
     /* Joining the threads waiting for the end of the thread */
     struct thread *th = (struct thread *) thread;
+
+    /* If the thread has already finished : just collect the retval and continue */
+    if(th->addr->exited)
+    {
+        if(retval) *retval = get_value(th->addr->rv);
+    }
+
+    return EXIT_SUCCESS;
+
+    /* If the thread is alive */
     inc_counter(th->addr->rv);
     STAILQ_INSERT_TAIL(&(th->addr->sleepq),(struct thread *) thread_self(),entries);
 
@@ -147,7 +159,7 @@ void thread_exit(void *retval)
 
 /*#############################################################################################*/
 
-__attribute__ ((constructor)) void first_thread (void)
+__attribute__ ((constructor)) void thread_create_main (void)
 {
     /* Initialization of the current thread */
     /* Initialization of the context */
@@ -181,23 +193,20 @@ __attribute__ ((constructor)) void first_thread (void)
     STAILQ_INIT(&g_runq);
 }
 
-__attribute__ ((destructor)) void cleaner (void)
+__attribute__ ((destructor)) void thread_exit_main (void)
 {
     thread * th;
 
-    /* Free the threads in the runqueue */
-    STAILQ_FOREACH(th, &g_runq, entries)
-    {
-        free(th->addr);
-        free(th);
-    }
-
-    /* Free the current thread */
+    /* Free the current thread which is the main */
     th=g_current_thread;
     VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
     free(th->addr->ctx->uc_stack.ss_sp);
     free(th->addr->ctx);
-    free_retval(th->addr->rv);
-    free(th->addr);
-    free(th);
+    //free_retval(th->addr->rv);
+    //free(th->addr);
+    //free(th);
+
+    /* Yield to let other threads continue */
+
+    /* Clean everything */
 }
