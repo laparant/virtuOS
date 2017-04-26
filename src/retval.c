@@ -13,7 +13,6 @@ void free_retval(struct retval *rv) {
   //free(rv->value);
   free(rv);
   rv = NULL;
-  //printf("%p\n", rv);
 }
 
 void *get_value(struct retval *rv) {

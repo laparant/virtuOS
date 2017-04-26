@@ -154,6 +154,7 @@ void thread_exit(void *retval)
 
 __attribute__ ((constructor)) void thread_create_main (void)
 {   
+    printf("Creating the main\n");
     /* Initialization of the current thread */
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
@@ -184,24 +185,70 @@ __attribute__ ((constructor)) void thread_create_main (void)
     /* Initialization of the queues */
     STAILQ_INIT(&g_all_threads);
     STAILQ_INIT(&g_runq);
+
+    /* Add to g_all_threads */
+    STAILQ_INSERT_TAIL(&g_all_threads, th, entries);
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
 {
     thread * th;
-
     /* Free the current thread which is the main */
+    /*
     th=g_current_thread;
     VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
     free(th->addr->ctx->uc_stack.ss_sp);
     free(th->addr->ctx);
-    //free_retval(th->addr->rv);
-    //free(th->addr);
-    //free(th);
+    free_retval(th->addr->rv);
+    free(th->addr);
+    free(th);
+    */
+    //while(!STAILQ_EMPTY(&g_runq)) thread_yield();
 
     /* Yield to let other threads continue */
+    /*
+    thread *new_current = STAILQ_FIRST(&g_runq);
 
+    STAILQ_REMOVE_HEAD(&g_runq, entries);
+
+    thread * tmp = g_current_thread;
+    g_current_thread = new_current;
+    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+*/
     /* Clean everything */
+    thread * th2;
+    thread * main_thread = STAILQ_FIRST(&g_all_threads);
+    th = STAILQ_NEXT(main_thread, entries);
+         while (th != NULL) {
+                printf("Freeing th : %p\n",th);
+                 th2 = STAILQ_NEXT(th, entries);
+                 VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
+                 free(th->addr->ctx->uc_stack.ss_sp);
+                 free(th->addr->ctx);
+                 free_retval(th->addr->rv);
+                 free(th->addr);
+                 free(th);
+                 th = th2;
+         }
+    STAILQ_INIT(&g_all_threads);
+    printf("All threads done\nNow, cleaning main (%p)\n",main_thread);
+    free(main_thread->addr->ctx->uc_stack.ss_sp);
+    free(main_thread->addr->ctx);
+    free_retval(main_thread->addr->rv);
+    free(main_thread->addr);
+    free(main_thread);
+
+/*
+    STAILQ_FOREACH(th,&g_all_threads,entries)
+    {
+        VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
+        free(th->addr->ctx->uc_stack.ss_sp);
+        free(th->addr->ctx);
+        free_retval(th->addr->rv);
+        free(th->addr);
+        free(th);
+    }
+    */
 }
 
 /* Clean the process exiting */
