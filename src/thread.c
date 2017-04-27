@@ -223,25 +223,32 @@ __attribute__ ((destructor)) void thread_exit_main (void)
 
     /* Clean everything */
     thread *th2;
-    thread *main_thread = STAILQ_FIRST(&g_all_threads);
-    th = STAILQ_NEXT(main_thread,all_entries);
+    thread *main_thread = g_current_thread;
+    //STAILQ_REMOVE_HEAD(&g_all_threads, all_entries);
+    th = STAILQ_FIRST(&g_all_threads);
     while (th != NULL) {
         th2 = STAILQ_NEXT(th, all_entries);
-        VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
-        free(th->addr->ctx->uc_stack.ss_sp);
-        free(th->addr->ctx);
-        free_retval(th->addr->rv);
-        free(th->addr);
-        free(th);
+        if(th != main_thread)
+        {
+            printf("Free %p-->%p(%p)\n",th,th2,main_thread);
+            VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
+            free(th->addr->ctx->uc_stack.ss_sp);
+            free(th->addr->ctx);
+            free_retval(th->addr->rv);
+            free(th->addr);
+            free(th);
+        }
         th = th2;
     }
-    STAILQ_INIT(&g_all_threads);
 
-    free(main_thread->addr->ctx->uc_stack.ss_sp);
+    VALGRIND_STACK_DEREGISTER(main_thread->addr->valgrind_stackid);
+    //free(main_thread->addr->ctx->uc_stack.ss_sp);
     free(main_thread->addr->ctx);
     free_retval(main_thread->addr->rv);
     free(main_thread->addr);
     free(main_thread);
+
+    STAILQ_INIT(&g_all_threads);
 }
 
 /* Clean the process exiting */
