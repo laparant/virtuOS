@@ -95,7 +95,6 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 
 int thread_yield(void)
 {
-    printf("KAWAIIIIIIIIIIIIII\n");
     STAILQ_INSERT_TAIL(&g_runq, g_current_thread, runq_entries);
     thread *new_current = STAILQ_FIRST(&g_runq);
 
