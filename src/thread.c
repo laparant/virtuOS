@@ -38,6 +38,12 @@ typedef struct thread_base
     int exited;
 } thread_base;
 
+void handle_alarm(int signal)
+{
+
+}
+
+
 thread_t thread_self(void)
 {
     return g_current_thread;
@@ -52,9 +58,6 @@ void force_exit(void *(*func)(void *), void *funcarg)
         thread_exit(res);
     }
 }
-
-
-
 
 
 int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
