@@ -8,6 +8,8 @@
 #include "thread.h"
 #include "retval.h"
 
+#define TIMESLICE 0.005
+
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
 typedef struct thread_base thread_base;
@@ -52,7 +54,7 @@ thread_t thread_self(void)
 
 void force_exit(void *(*func)(void *), void *funcarg)
 {
-    if(func != NULL)
+    if (func != NULL)
     {
         void *res = func(funcarg);
         thread_exit(res);
@@ -222,6 +224,10 @@ __attribute__ ((constructor)) void thread_create_main (void)
 
     /* Insert in the global queue */
     STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
+
+    /* Setting up the alarm for preemption */
+    signal(SIGALRM, handle_alarm);
+    alarm(TIMESLICE);
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
