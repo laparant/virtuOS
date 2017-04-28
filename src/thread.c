@@ -99,7 +99,7 @@ int thread_yield(void)
 
     STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
 
-    thread * tmp = g_current_thread;
+    thread *tmp = g_current_thread;
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
@@ -151,12 +151,12 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
     /* Waking up all the threads waiting for me */
     STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
     {
-        STAILQ_REMOVE_HEAD(&(me->addr->sleepq),sleepq_entries);
+        STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
         STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
     }
 
     /* Yielding to next thread if others threads are running*/
-    if(!STAILQ_EMPTY(&g_runq))
+    if (!STAILQ_EMPTY(&g_runq))
     {
         thread *new_current = STAILQ_FIRST(&g_runq);
         g_current_thread = new_current;
@@ -169,7 +169,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
     }
 
     /* Leaving the runqueue */
-    if(me != STAILQ_FIRST(&g_all_threads))
+    if (me != STAILQ_FIRST(&g_all_threads))
     {
         CHECK(setcontext(g_current_thread->addr->ctx), -1, "thread_exit: setcontext")
     }
@@ -218,7 +218,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     STAILQ_INIT(&g_runq);
 
     /* Insert in the global queue */
-    STAILQ_INSERT_HEAD(&g_all_threads,th,all_entries);
+    STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
@@ -226,7 +226,7 @@ __attribute__ ((destructor)) void thread_exit_main (void)
 
     thread *th;
     thread *me = (thread *) thread_self();
-    if(me->addr->exited == 0)
+    if (me->addr->exited == 0)
     {
         me->addr->exited = 1;
 
@@ -238,12 +238,12 @@ __attribute__ ((destructor)) void thread_exit_main (void)
         /* Waking up all the threads waiting for me */
         STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
         {
-            STAILQ_REMOVE_HEAD(&(me->addr->sleepq),sleepq_entries);
+            STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
             STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
         }
 
         /* If others threads are running */
-        while(!STAILQ_EMPTY(&g_runq))
+        while (!STAILQ_EMPTY(&g_runq))
         {
             thread *new_current = STAILQ_FIRST(&g_runq);
             g_current_thread = new_current;
@@ -262,7 +262,7 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     while (th != NULL)
     {
         th2 = STAILQ_NEXT(th, all_entries);
-        if(th != main_thread)
+        if (th != main_thread)
         {
             VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
             free(th->addr->ctx->uc_stack.ss_sp);
