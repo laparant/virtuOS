@@ -4,8 +4,9 @@
 #include <errno.h>
 #include <sys/queue.h> // Using the singly linked tail queue STAILQ for runq
 #include <valgrind/valgrind.h>
-
 #include "thread.h"
+
+#ifndef USE_PTHREAD
 #include "retval.h"
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
@@ -293,3 +294,4 @@ void free_resources(thread *th)
     free(th->addr->ctx->uc_stack.ss_sp);
     free(th->addr->ctx);
 }
+#endif
