@@ -55,6 +55,15 @@ void force_exit(void *(*func)(void *), void *funcarg)
 }
 
 
+/* Clean the process exiting */
+void free_resources(thread *th)
+{
+    /* Free the resources */
+    VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
+    free(th->addr->ctx->uc_stack.ss_sp);
+    free(th->addr->ctx);
+    free_retval((thread_t)th->addr->rv);
+}
 
 
 
@@ -113,13 +122,13 @@ int thread_join(thread_t thread, void **retval)
     /* Joining the threads waiting for the end of the thread */
     struct thread *th = (struct thread *) thread;
 
-    /* If the thread has already finished : just collect the retval and continue */
-    if (th->addr->exited)
+    /* If the thread has already finished: an error might occur but we won't check it */
+    /*if (th->addr->exited) //just trash this
     {
         if (retval) *retval = get_value(th->addr->rv);
         return EXIT_SUCCESS;
     }
-
+    */
     /* If the thread is alive */
     inc_counter(th->addr->rv);
     STAILQ_INSERT_TAIL(&(th->addr->sleepq), (struct thread *) thread_self(), sleepq_entries);
@@ -136,7 +145,13 @@ int thread_join(thread_t thread, void **retval)
     /* Collecting the value of retval */
     if (retval) *retval = get_value(th->addr->rv);
     dec_counter(th->addr->rv);
+    //remove the thread from g_all_threads
 
+    //free everything that's not been freed in thread_exit
+    //context
+    STAILQ_REMOVE(&g_all_threads, th, thread, g_all_threads);
+    free_resources(th);
+    //g_all_threads
     return EXIT_SUCCESS;
 }
 
@@ -186,7 +201,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 /*#############################################################################################*/
 
 __attribute__ ((constructor)) void thread_create_main (void)
-{   
+{
     /* Initialization of the current thread */
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
@@ -286,12 +301,4 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     STAILQ_INIT(&g_all_threads);
 }
 
-/* Clean the process exiting */
-void free_resources(thread *th)
-{
-    /* Free the resources */
-    VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
-    free(th->addr->ctx->uc_stack.ss_sp);
-    free(th->addr->ctx);
-}
 #endif
