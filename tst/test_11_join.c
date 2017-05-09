@@ -38,7 +38,7 @@ int main()
   err = thread_join(th, &res);
   assert(!err);
   assert(res == (void*) 0xdeadbeef);
-
+  printf("entre les deux join\n");
   err = thread_join(th2, &res);
   assert(!err);
   assert(res == (void*) 0xbeefdead);

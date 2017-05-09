@@ -5,7 +5,7 @@
 struct retval *init_retval()
 {
     struct retval *rv = malloc(sizeof( struct retval));
-    rv->counter = 0;
+    //rv->counter = 0;
     rv->value = NULL;
     return rv;
 }
@@ -21,6 +21,7 @@ void *get_value(struct retval *rv)
     return rv->value;
 }
 
+/*
 int inc_counter(struct retval *rv)
 {
     if (rv != NULL)
@@ -40,3 +41,4 @@ int dec_counter(struct retval *rv) {
     }
     return EXIT_FAILURE;
 }
+*/

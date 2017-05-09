@@ -123,35 +123,38 @@ int thread_join(thread_t thread, void **retval)
     struct thread *th = (struct thread *) thread;
 
     /* If the thread has already finished: an error might occur but we won't check it */
-    /*if (th->addr->exited) //just trash this
+    /*if (th->addr->exited)
     {
         if (retval) *retval = get_value(th->addr->rv);
         return EXIT_SUCCESS;
     }
     */
     /* If the thread is alive */
-    inc_counter(th->addr->rv);
+    //inc_counter(th->addr->rv);
     STAILQ_INSERT_TAIL(&(th->addr->sleepq), (struct thread *) thread_self(), sleepq_entries);
 
     /* Sleeping while the thread hasn't finished */
     struct thread *new_current = STAILQ_FIRST(&g_runq);
 
-    STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
+    STAILQ_REMOVE_HEAD(&g_runq, runq_entries); //SEGFAULT ICI
 
     struct thread *tmp = g_current_thread;
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
+    printf("coucou4\n");
     /* Collecting the value of retval */
     if (retval) *retval = get_value(th->addr->rv);
-    dec_counter(th->addr->rv);
-    //remove the thread from g_all_threads
-
-    //free everything that's not been freed in thread_exit
-    //context
-    STAILQ_REMOVE(&g_all_threads, th, thread, g_all_threads);
-    free_resources(th);
-    //g_all_threads
+    //dec_counter(th->addr->rv);
+    printf("coucou5\n");
+    STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
+    printf("coucou6\n");
+    /* If not thread main free the resources */
+    if(th != STAILQ_FIRST(&g_all_threads)) {
+      printf("Je suis pas le maiiiiin !!!\n");
+      free_resources(th);
+      printf("après le free\n");
+    }
     return EXIT_SUCCESS;
 }
 
@@ -163,9 +166,10 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 
     /* Set the retval */
     if (retval) me->addr->rv->value = retval;
-    inc_counter(me->addr->rv);
+    //inc_counter(me->addr->rv);
 
     /* Waking up all the threads waiting for me */
+    //Since only one is waiting we shouldn't wake up more than one
     STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
     {
         STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
