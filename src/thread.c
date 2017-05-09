@@ -63,6 +63,8 @@ void free_resources(thread *th)
     free(th->addr->ctx->uc_stack.ss_sp);
     free(th->addr->ctx);
     free_retval((thread_t)th->addr->rv);
+    free(th->addr);
+    free(th);
 }
 
 
