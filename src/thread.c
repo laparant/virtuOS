@@ -8,6 +8,7 @@
 
 #ifndef USE_PTHREAD
 #include "retval.h"
+#include "errors.h"
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
@@ -18,7 +19,6 @@ typedef struct thread
     thread_base *addr;
     STAILQ_ENTRY(thread) runq_entries; // This entry will be used for the runq
     STAILQ_ENTRY(thread) all_entries; // This entry will be used for the all_threads queue
-    STAILQ_ENTRY(thread) sleepq_entries; // This entry will be used for the sleepq
 } thread;
 
 /* The thread that is currently being executed */
@@ -32,7 +32,7 @@ static STAILQ_HEAD(thread_list_run, thread) g_runq;
 
 typedef struct thread_base
 {
-    STAILQ_HEAD(thread_list_sleep, thread) sleepq;
+    thread *sleepq;
     struct retval *rv;
     ucontext_t *ctx;
     int valgrind_stackid;
@@ -91,7 +91,7 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     th->addr->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    STAILQ_INIT(&(th->addr->sleepq));
+    th->addr->sleepq = NULL;
 
     /* Insert the current thread in the run queue */
     STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
@@ -104,7 +104,6 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 
 int thread_yield(void)
 {
-    printf("KAWAIIIIIIIIIIIIII\n");
     STAILQ_INSERT_TAIL(&g_runq, g_current_thread, runq_entries);
     thread *new_current = STAILQ_FIRST(&g_runq);
 
@@ -122,16 +121,34 @@ int thread_join(thread_t thread, void **retval)
     /* Joining the threads waiting for the end of the thread */
     struct thread *th = (struct thread *) thread;
 
+    /* Search if the thread does exist => error : ESRCH */
+    struct thread *th_i;
+    STAILQ_FOREACH(th_i, &g_all_threads, all_entries)
+    {
+        if(th_i == th)
+            break;
+        if(STAILQ_NEXT(th_i,all_entries) == NULL)
+            return ESRCH;
+    }
+
+    /* Detecting the deadlock (the thread is waiting for me) => error : EDEADLK */
+    struct thread *me = thread_self();
+    if (th == me->addr->sleepq)
+        return EDEADLK;
+
+    /* Detecting if the thread is already joined by another thread */
+    if (th->addr->sleepq != NULL)
+        return EINVAL;
+
     /* If the thread has already finished: an error might occur but we won't check it */
-    /*if (th->addr->exited)
+    if (th->addr->exited)
     {
         if (retval) *retval = get_value(th->addr->rv);
         return EXIT_SUCCESS;
     }
-    */
+
     /* If the thread is alive */
-    //inc_counter(th->addr->rv);
-    STAILQ_INSERT_TAIL(&(th->addr->sleepq), (struct thread *) thread_self(), sleepq_entries);
+    th->addr->sleepq = me;
 
     /* Sleeping while the thread hasn't finished */
     struct thread *new_current = STAILQ_FIRST(&g_runq);
@@ -142,39 +159,29 @@ int thread_join(thread_t thread, void **retval)
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
-    printf("coucou4\n");
     /* Collecting the value of retval */
     if (retval) *retval = get_value(th->addr->rv);
-    //dec_counter(th->addr->rv);
-    printf("coucou5\n");
-    STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
-    printf("coucou6\n");
+
     /* If not thread main free the resources */
     if(th != STAILQ_FIRST(&g_all_threads)) {
-      printf("Je suis pas le maiiiiin !!!\n");
+      // Removing the thread from the threads joignable
+      STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
       free_resources(th);
-      printf("après le free\n");
     }
     return EXIT_SUCCESS;
 }
 
 __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 {
-    thread *th;
     thread *me = (thread *) thread_self();
     me->addr->exited = 1;
 
     /* Set the retval */
     if (retval) me->addr->rv->value = retval;
-    //inc_counter(me->addr->rv);
 
-    /* Waking up all the threads waiting for me */
-    //Since only one is waiting we shouldn't wake up more than one
-    STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
-    {
-        STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
-        STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
-    }
+    /* Waking up the thread waiting for me */
+    if(me->addr->sleepq != NULL)
+        STAILQ_INSERT_TAIL(&g_runq, me->addr->sleepq, runq_entries);
 
     /* Yielding to next thread if others threads are running*/
     if (!STAILQ_EMPTY(&g_runq))
@@ -229,7 +236,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     th->addr->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    STAILQ_INIT(&(th->addr->sleepq));
+    th->addr->sleepq=NULL;
 
     /* Initializing the current thread */
     g_current_thread = th;
@@ -256,12 +263,9 @@ __attribute__ ((destructor)) void thread_exit_main (void)
         //inc_counter(me->addr->rv);
         // could not be done because no retval : find a solution
 
-        /* Waking up all the threads waiting for me */
-        STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
-        {
-            STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
-            STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
-        }
+        /* Waking up the thread waiting for me */
+        if(me->addr->sleepq != NULL)
+            STAILQ_INSERT_TAIL(&g_runq, me->addr->sleepq, runq_entries);
 
         /* If others threads are running */
         while (!STAILQ_EMPTY(&g_runq))
