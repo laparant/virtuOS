@@ -8,7 +8,7 @@
 
 #ifndef USE_PTHREAD
 #include "retval.h"
-#include "errors.h"
+#include "define.h"
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
