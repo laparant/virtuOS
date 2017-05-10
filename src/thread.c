@@ -1,16 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ucontext.h>
 #include <errno.h>
 #include <sys/queue.h> // Using the singly linked tail queue STAILQ for runq
+#include <sys/time.h>
+#include <signal.h>
 #include <valgrind/valgrind.h>
 
 #include "thread.h"
 #include "retval.h"
 
-#define TIMESLICE 0.005
+#define TIMESLICE 5000 // 5 milliseconds in microseconds
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
+
+static int g_can_interrupt = 1;
 
 typedef struct thread_base thread_base;
 
@@ -40,9 +45,30 @@ typedef struct thread_base
     int exited;
 } thread_base;
 
-void handle_alarm(int signal)
+int can_interrupt()
 {
+    return g_can_interrupt;
+}
 
+void enable_interruptions()
+{
+    g_can_interrupt = 1;
+}
+
+void disable_interruptions()
+{
+    g_can_interrupt = 0;
+}
+
+void alarm_handler(int signal)
+{
+    if (can_interrupt())
+    {
+        disable_interruptions();
+        printf("alarm\n");
+        thread_yield();
+        enable_interruptions();
+    }
 }
 
 
@@ -85,6 +111,8 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     /* Get the return value */
     th->addr->rv = init_retval();
 
+    disable_interruptions();
+
     /* Initialize the thread's sleep queue */
     STAILQ_INIT(&(th->addr->sleepq));
 
@@ -94,11 +122,15 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     STAILQ_INSERT_TAIL(&g_all_threads, th, all_entries);
     *newthread = (thread_t) th;
 
+    enable_interruptions();
+
     return EXIT_SUCCESS;
 }
 
 int thread_yield(void)
 {
+    disable_interruptions();
+
     STAILQ_INSERT_TAIL(&g_runq, g_current_thread, runq_entries);
     thread *new_current = STAILQ_FIRST(&g_runq);
 
@@ -107,6 +139,8 @@ int thread_yield(void)
     thread *tmp = g_current_thread;
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+
+    enable_interruptions();
 
     return EXIT_SUCCESS;
 }
@@ -190,6 +224,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 
 __attribute__ ((constructor)) void thread_create_main (void)
 {   
+    enable_interruptions();
     /* Initialization of the current thread */
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
@@ -225,9 +260,24 @@ __attribute__ ((constructor)) void thread_create_main (void)
     /* Insert in the global queue */
     STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
 
-    /* Setting up the alarm for preemption */
-    signal(SIGALRM, handle_alarm);
-    alarm(TIMESLICE);
+    /* ---- Setting up the alarm for preemption ---- */
+
+    struct sigaction sa;
+    struct itimerval timer;
+
+    /* Install alarm_handler as the signal handler for SIGVTALRM */
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &alarm_handler;
+    CHECK(sigaction(SIGVTALRM, &sa, NULL), -1, "thread_create_main: sigaction")
+
+    /* Configure the timer to expire after the timeslice */
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = TIMESLICE;
+    /* ... and after every timeslice after that */
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = TIMESLICE;
+    /* Start a virtual timer. It counts down whenever this process is executing */
+    CHECK(setitimer(ITIMER_VIRTUAL, &timer, NULL), -1, "thread_create_main: setitimer")
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
