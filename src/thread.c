@@ -62,14 +62,18 @@ void force_exit(void *(*func)(void *), void *funcarg)
 /* Clean the process exiting */
 void free_context(thread *th)
 {
+    STAILQ_REMOVE(&g_to_free, th, thread, to_free_entries);
     /* Free the resources */
     VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
     free(th->addr->ctx->uc_stack.ss_sp);
     free(th->addr->ctx);
+    th->addr->status = ALREADY_FREE;
 }
 
 void free_join(thread *th)
 {
+    if(th->addr->status == TO_FREE)
+        free_context(th);
     free_retval(th->addr->rv);
     free(th->addr);
     free(th);
@@ -125,7 +129,6 @@ int thread_yield(void)
     STAILQ_FOREACH(th_i, &g_to_free, to_free_entries)
     {
         free_context(th_i);
-        STAILQ_REMOVE(&g_to_free, th_i, thread, to_free_entries);
     }
 
     return EXIT_SUCCESS;
@@ -159,6 +162,12 @@ int thread_join(thread_t thread, void **retval)
     if (th->addr->status != RUNNING)
     {
         if (retval) *retval = get_value(th->addr->rv);
+        /* If not thread main free the resources */
+        if(th != STAILQ_FIRST(&g_all_threads)) {
+          // Removing the thread from the threads joignable
+          STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
+          free_join(th);
+        }
         return EXIT_SUCCESS;
     }
 
@@ -168,11 +177,11 @@ int thread_join(thread_t thread, void **retval)
     /* Sleeping while the thread hasn't finished */
     struct thread *new_current = STAILQ_FIRST(&g_runq);
 
-    STAILQ_REMOVE_HEAD(&g_runq, runq_entries); //SEGFAULT ICI
+    STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
 
     struct thread *tmp = g_current_thread;
     g_current_thread = new_current;
-    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_join: swapcontext")
 
     /* Collecting the value of retval */
     if (retval) *retval = get_value(th->addr->rv);
@@ -296,17 +305,22 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     }
 
     /* Clean everything */
+    thread *main_thread = g_current_thread;
+    thread *th2;
+
     /* Free the context of the threads exited remaing */
-    struct thread *th_i;
-    STAILQ_FOREACH(th_i, &g_to_free, to_free_entries)
+    th = STAILQ_FIRST(&g_to_free);
+    while(th != NULL)
     {
-        free_context(th_i);
-        STAILQ_REMOVE(&g_to_free, th_i, thread, to_free_entries);
+        if (th != main_thread)
+        {
+            free_context(th);
+        }
+        th = th2;
     }
 
+
     /* Free the remaining things */
-    thread *th2;
-    thread *main_thread = g_current_thread;
     th = STAILQ_FIRST(&g_all_threads);
     while (th != NULL)
     {
