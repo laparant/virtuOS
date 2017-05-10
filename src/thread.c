@@ -36,7 +36,7 @@ typedef struct thread_base
     struct retval *rv;
     ucontext_t *ctx;
     int valgrind_stackid;
-    int exited;
+    int status;
 } thread_base;
 
 thread_t thread_self(void)
@@ -85,7 +85,7 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
-    th->addr->exited = 0;
+    th->addr->status = RUNNING;
     th->addr->ctx->uc_link = NULL;
     makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, func, funcarg);
 
@@ -143,7 +143,7 @@ int thread_join(thread_t thread, void **retval)
         return EINVAL;
 
     /* If the thread has already finished: an error might occur but we won't check it */
-    if (th->addr->exited)
+    if (th->addr->status != RUNNING)
     {
         if (retval) *retval = get_value(th->addr->rv);
         return EXIT_SUCCESS;
@@ -176,7 +176,7 @@ int thread_join(thread_t thread, void **retval)
 __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 {
     thread *me = (thread *) thread_self();
-    me->addr->exited = 1;
+    me->addr->status = TO_FREE;
 
     /* Set the retval */
     if (retval) me->addr->rv->value = retval;
@@ -230,7 +230,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
-    th->addr->exited = 0;
+    th->addr->status = RUNNING;
     th->addr->ctx->uc_link = NULL;
     makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, NULL, NULL);
 
@@ -256,13 +256,12 @@ __attribute__ ((destructor)) void thread_exit_main (void)
 
     thread *th;
     thread *me = (thread *) thread_self();
-    if (me->addr->exited == 0)
+    if (me->addr->status == RUNNING)
     {
-        me->addr->exited = 1;
+        me->addr->status = TO_FREE;
 
         /* Set the retval */
         //if (retval) me->addr->rv->value = retval;
-        //inc_counter(me->addr->rv);
         // could not be done because no retval : find a solution
 
         /* Waking up the thread waiting for me */
