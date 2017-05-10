@@ -66,6 +66,7 @@ void alarm_handler(int signal)
     {
         disable_interruptions();
         printf("alarm\n");
+        //printf("%p\n", &g_current_thread->addr);
         thread_yield();
         enable_interruptions();
     }
