@@ -312,6 +312,7 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     th = STAILQ_FIRST(&g_to_free);
     while(th != NULL)
     {
+        th2 = STAILQ_NEXT(th, all_entries);
         if (th != main_thread)
         {
             free_context(th);
