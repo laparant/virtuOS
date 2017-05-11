@@ -8,6 +8,7 @@
 
 #ifndef USE_PTHREAD
 #include "retval.h"
+#include "define.h"
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
@@ -18,7 +19,7 @@ typedef struct thread
     thread_base *addr;
     STAILQ_ENTRY(thread) runq_entries; // This entry will be used for the runq
     STAILQ_ENTRY(thread) all_entries; // This entry will be used for the all_threads queue
-    STAILQ_ENTRY(thread) sleepq_entries; // This entry will be used for the sleepq
+    STAILQ_ENTRY(thread) to_free_entries; // This entry will be used for the to_free queue
 } thread;
 
 /* The thread that is currently being executed */
@@ -30,13 +31,16 @@ static STAILQ_HEAD(thread_list_all, thread) g_all_threads;
 /* The run queue */
 static STAILQ_HEAD(thread_list_run, thread) g_runq;
 
+/* The to free queue */
+static STAILQ_HEAD(thread_list_free, thread) g_to_free;
+
 typedef struct thread_base
 {
-    STAILQ_HEAD(thread_list_sleep, thread) sleepq;
+    thread *sleepq;
     struct retval *rv;
     ucontext_t *ctx;
     int valgrind_stackid;
-    int exited;
+    int status;
 } thread_base;
 
 thread_t thread_self(void)
@@ -55,8 +59,25 @@ void force_exit(void *(*func)(void *), void *funcarg)
 }
 
 
+/* Clean the process exiting */
+void free_context(thread *th)
+{
+    STAILQ_REMOVE(&g_to_free, th, thread, to_free_entries);
+    /* Free the resources */
+    VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
+    free(th->addr->ctx->uc_stack.ss_sp);
+    free(th->addr->ctx);
+    th->addr->status = ALREADY_FREE;
+}
 
-
+void free_join(thread *th)
+{
+    if(th->addr->status == TO_FREE)
+        free_context(th);
+    free_retval(th->addr->rv);
+    free(th->addr);
+    free(th);
+}
 
 int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 {
@@ -74,7 +95,7 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
-    th->addr->exited = 0;
+    th->addr->status = RUNNING;
     th->addr->ctx->uc_link = NULL;
     makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, func, funcarg);
 
@@ -82,7 +103,7 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     th->addr->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    STAILQ_INIT(&(th->addr->sleepq));
+    th->addr->sleepq = NULL;
 
     /* Insert the current thread in the run queue */
     STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
@@ -104,6 +125,12 @@ int thread_yield(void)
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
+    struct thread *th_i;
+    STAILQ_FOREACH(th_i, &g_to_free, to_free_entries)
+    {
+        free_context(th_i);
+    }
+
     return EXIT_SUCCESS;
 }
 
@@ -112,16 +139,40 @@ int thread_join(thread_t thread, void **retval)
     /* Joining the threads waiting for the end of the thread */
     struct thread *th = (struct thread *) thread;
 
-    /* If the thread has already finished : just collect the retval and continue */
-    if (th->addr->exited)
+    /* Search if the thread does exist => error : ESRCH */
+    struct thread *th_i;
+    STAILQ_FOREACH(th_i, &g_all_threads, all_entries)
+    {
+        if(th_i == th)
+            break;
+        if(STAILQ_NEXT(th_i,all_entries) == NULL)
+            return ESRCH;
+    }
+
+    /* Detecting the deadlock (the thread is waiting for me) => error : EDEADLK */
+    struct thread *me = thread_self();
+    if (th == me->addr->sleepq)
+        return EDEADLK;
+
+    /* Detecting if the thread is already joined by another thread */
+    if (th->addr->sleepq != NULL)
+        return EINVAL;
+
+    /* If the thread has already finished: an error might occur but we won't check it */
+    if (th->addr->status != RUNNING)
     {
         if (retval) *retval = get_value(th->addr->rv);
+        /* If not thread main free the resources */
+        if(th != STAILQ_FIRST(&g_all_threads)) {
+          // Removing the thread from the threads joignable
+          STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
+          free_join(th);
+        }
         return EXIT_SUCCESS;
     }
 
     /* If the thread is alive */
-    inc_counter(th->addr->rv);
-    STAILQ_INSERT_TAIL(&(th->addr->sleepq), (struct thread *) thread_self(), sleepq_entries);
+    th->addr->sleepq = me;
 
     /* Sleeping while the thread hasn't finished */
     struct thread *new_current = STAILQ_FIRST(&g_runq);
@@ -130,31 +181,31 @@ int thread_join(thread_t thread, void **retval)
 
     struct thread *tmp = g_current_thread;
     g_current_thread = new_current;
-    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_join: swapcontext")
 
     /* Collecting the value of retval */
     if (retval) *retval = get_value(th->addr->rv);
-    dec_counter(th->addr->rv);
 
+    /* If not thread main free the resources */
+    if(th != STAILQ_FIRST(&g_all_threads)) {
+      // Removing the thread from the threads joignable
+      STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
+      free_join(th);
+    }
     return EXIT_SUCCESS;
 }
 
 __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 {
-    thread *th;
     thread *me = (thread *) thread_self();
-    me->addr->exited = 1;
+    me->addr->status = TO_FREE;
 
     /* Set the retval */
     if (retval) me->addr->rv->value = retval;
-    inc_counter(me->addr->rv);
 
-    /* Waking up all the threads waiting for me */
-    STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
-    {
-        STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
-        STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
-    }
+    /* Waking up the thread waiting for me */
+    if(me->addr->sleepq != NULL)
+        STAILQ_INSERT_TAIL(&g_runq, me->addr->sleepq, runq_entries);
 
     /* Yielding to next thread if others threads are running*/
     if (!STAILQ_EMPTY(&g_runq))
@@ -172,6 +223,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
     /* Leaving the runqueue */
     if (me != STAILQ_FIRST(&g_all_threads))
     {
+        STAILQ_INSERT_TAIL(&g_to_free, me, to_free_entries);
         CHECK(setcontext(g_current_thread->addr->ctx), -1, "thread_exit: setcontext")
     }
     /* Main */
@@ -185,7 +237,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 /*#############################################################################################*/
 
 __attribute__ ((constructor)) void thread_create_main (void)
-{   
+{
     /* Initialization of the current thread */
     /* Initialization of the context */
     thread *th = malloc(sizeof(thread));
@@ -201,7 +253,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
-    th->addr->exited = 0;
+    th->addr->status = RUNNING;
     th->addr->ctx->uc_link = NULL;
     makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, NULL, NULL);
 
@@ -209,7 +261,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     th->addr->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    STAILQ_INIT(&(th->addr->sleepq));
+    th->addr->sleepq=NULL;
 
     /* Initializing the current thread */
     g_current_thread = th;
@@ -217,6 +269,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     /* Initialization of the queues */
     STAILQ_INIT(&g_all_threads);
     STAILQ_INIT(&g_runq);
+    STAILQ_INIT(&g_to_free);
 
     /* Insert in the global queue */
     STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
@@ -227,21 +280,17 @@ __attribute__ ((destructor)) void thread_exit_main (void)
 
     thread *th;
     thread *me = (thread *) thread_self();
-    if (me->addr->exited == 0)
+    if (me->addr->status == RUNNING)
     {
-        me->addr->exited = 1;
+        me->addr->status = TO_FREE;
 
         /* Set the retval */
         //if (retval) me->addr->rv->value = retval;
-        //inc_counter(me->addr->rv);
         // could not be done because no retval : find a solution
 
-        /* Waking up all the threads waiting for me */
-        STAILQ_FOREACH(th, &(me->addr->sleepq), sleepq_entries)
-        {
-            STAILQ_REMOVE_HEAD(&(me->addr->sleepq), sleepq_entries);
-            STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
-        }
+        /* Waking up the thread waiting for me */
+        if(me->addr->sleepq != NULL)
+            STAILQ_INSERT_TAIL(&g_runq, me->addr->sleepq, runq_entries);
 
         /* If others threads are running */
         while (!STAILQ_EMPTY(&g_runq))
@@ -256,21 +305,30 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     }
 
     /* Clean everything */
-    thread *th2;
     thread *main_thread = g_current_thread;
-    //STAILQ_REMOVE_HEAD(&g_all_threads, all_entries);
+    thread *th2;
+
+    /* Free the context of the threads exited remaing */
+    th = STAILQ_FIRST(&g_to_free);
+    while(th != NULL)
+    {
+        th2 = STAILQ_NEXT(th, all_entries);
+        if (th != main_thread)
+        {
+            free_context(th);
+        }
+        th = th2;
+    }
+
+
+    /* Free the remaining things */
     th = STAILQ_FIRST(&g_all_threads);
     while (th != NULL)
     {
         th2 = STAILQ_NEXT(th, all_entries);
         if (th != main_thread)
         {
-            VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
-            free(th->addr->ctx->uc_stack.ss_sp);
-            free(th->addr->ctx);
-            free_retval(th->addr->rv);
-            free(th->addr);
-            free(th);
+            free_join(th);
         }
         th = th2;
     }
@@ -285,12 +343,4 @@ __attribute__ ((destructor)) void thread_exit_main (void)
     STAILQ_INIT(&g_all_threads);
 }
 
-/* Clean the process exiting */
-void free_resources(thread *th)
-{
-    /* Free the resources */
-    VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
-    free(th->addr->ctx->uc_stack.ss_sp);
-    free(th->addr->ctx);
-}
 #endif

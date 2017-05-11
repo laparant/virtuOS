@@ -29,6 +29,8 @@ extern int thread_yield(void);
 /* attendre la fin d'exécution d'un thread.
  * la valeur renvoyée par le thread est placée dans *retval.
  * si retval est NULL, la valeur de retour est ignorée.
+ * /!\on peut join qu'un thread
+ * si on join un thread non initialisé avec thread_create ou non existant le comportement sera indéfini
  */
 extern int thread_join(thread_t thread, void **retval);
 
