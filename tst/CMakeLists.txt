@@ -43,13 +43,13 @@ target_link_libraries (test32 thread)
 add_executable(test51 test_51_fibonacci.c)
 target_link_libraries (test51 thread)
 
-# test_61_preemption
-add_executable(test_61_preemption test_61_preemption.c)
-target_link_libraries (test_61_preemption thread)
+# test_71_preemption
+add_executable(test_71_preemption test_71_preemption.c)
+target_link_libraries (test_71_preemption thread)
 
-# test_62_preemption
-add_executable(test_62_preemption test_62_preemption.c)
-target_link_libraries (test_62_preemption thread)
+# test_72_preemption
+add_executable(test_72_preemption test_72_preemption.c)
+target_link_libraries (test_72_preemption thread)
 
 # TO ADD when thread_mutex_unlock, thread_mutex_init and thread_mutex_destroy will be done
 # test 61-mutex.c
