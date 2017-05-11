@@ -11,7 +11,7 @@
 #include "thread.h"
 #include "retval.h"
 
-#define TIMESLICE 10000 // 10 milliseconds in microseconds
+#define TIMESLICE 8000 // 8 milliseconds in microseconds (multiple of Linux clock tick)
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
