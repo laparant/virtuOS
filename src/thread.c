@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <errno.h>
-#include <search.h> //Using the hashtable for the g_all_thread
 #include <sys/queue.h> // Using the singly linked tail queue STAILQ for runq
 #include <valgrind/valgrind.h>
 #include "thread.h"
@@ -19,7 +18,7 @@ typedef struct thread
 {
     thread_base *addr;
     STAILQ_ENTRY(thread) runq_entries; // This entry will be used for the runq
-    //STAILQ_ENTRY(thread) all_entries; // This entry will be used for the all_threads queue
+    STAILQ_ENTRY(thread) all_entries; // This entry will be used for the all_threads queue
     STAILQ_ENTRY(thread) to_free_entries; // This entry will be used for the to_free queue
 } thread;
 
@@ -27,9 +26,7 @@ typedef struct thread
 static thread * g_current_thread;
 
 /* The list of all the threads that were created */
-/* Will become a hashtable */
-//static STAILQ_HEAD(thread_list_all, thread) g_all_threads;
-
+static STAILQ_HEAD(thread_list_all, thread) g_all_threads;
 
 /* The run queue */
 static STAILQ_HEAD(thread_list_run, thread) g_runq;
@@ -110,8 +107,8 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 
     /* Insert the current thread in the run queue */
     STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
-    /* Put the thread in the hash table so we can free it later */
-    CHECK(hsearch(th, ENTRY), NULL, "hadd: thread_create")
+    /* Put the thread in g_all_threads so we can free it later */
+    STAILQ_INSERT_TAIL(&g_all_threads, th, all_entries);
     *newthread = (thread_t) th;
 
     return EXIT_SUCCESS;
@@ -144,8 +141,13 @@ int thread_join(thread_t thread, void **retval)
 
     /* Search if the thread does exist => error : ESRCH */
     struct thread *th_i;
-
-    if(hsearch(th, FIND) == NULL) return ESRCH;
+    STAILQ_FOREACH(th_i, &g_all_threads, all_entries)
+    {
+        if(th_i == th)
+            break;
+        if(STAILQ_NEXT(th_i,all_entries) == NULL)
+            return ESRCH;
+    }
 
     /* Detecting the deadlock (the thread is waiting for me) => error : EDEADLK */
     struct thread *me = thread_self();
@@ -161,7 +163,7 @@ int thread_join(thread_t thread, void **retval)
     {
         if (retval) *retval = get_value(th->addr->rv);
         /* If not thread main free the resources */
-        if(th != STAILQ_FIRST(&g_all_threads)) { /* find a way to check if main with the hashtable */
+        if(th != STAILQ_FIRST(&g_all_threads)) {
           // Removing the thread from the threads joignable
           STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
           free_join(th);
@@ -265,12 +267,12 @@ __attribute__ ((constructor)) void thread_create_main (void)
     g_current_thread = th;
 
     /* Initialization of the queues */
-    CHECK(hcreate(MAX_ENTRIES), 0, "hcreate: g_all_threads") //this was g_all_thread
+    STAILQ_INIT(&g_all_threads);
     STAILQ_INIT(&g_runq);
     STAILQ_INIT(&g_to_free);
 
     /* Insert in the global queue */
-    CHECK(hsearch(th, ENTER), NULL, "hadd: main")
+    STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
