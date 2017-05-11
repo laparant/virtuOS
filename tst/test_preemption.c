@@ -4,23 +4,22 @@
 #include <sys/time.h>
 #include "../src/thread.h"
 
-int stop;
+struct timeval time1;
 
 void *thread1_func()
 {
-    while (1)//;
-        printf("thread1\n");
+    while (1)
+    {
+        gettimeofday(&time1, NULL);
+    }
 }
 
 void *thread2_func()
 {
-    struct timeval time;
     while (1)
     {
-        printf("preemption\n");
-        gettimeofday(&time, NULL);
-        printf("%lds   %ldus\n", time.tv_sec, time.tv_usec);
-        thread_yield();
+        gettimeofday(&time1, NULL);
+        //printf("%ld  %ld\n", time1.tv_sec, time1.tv_usec);
     }
 }
 

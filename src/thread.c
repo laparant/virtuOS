@@ -11,11 +11,9 @@
 #include "thread.h"
 #include "retval.h"
 
-#define TIMESLICE 5000 // 5 milliseconds in microseconds
+#define TIMESLICE 10000 // 10 milliseconds in microseconds
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
-
-static int g_can_interrupt = 1;
 
 typedef struct thread_base thread_base;
 
@@ -45,31 +43,29 @@ typedef struct thread_base
     int exited;
 } thread_base;
 
-int can_interrupt()
-{
-    return g_can_interrupt;
-}
-
 void enable_interruptions()
 {
-    g_can_interrupt = 1;
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGPROF);
+    CHECK(sigprocmask(SIG_UNBLOCK, &set, NULL), -1, "enable_interruptions: sigprocmask")
 }
 
 void disable_interruptions()
 {
-    g_can_interrupt = 0;
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGPROF);
+    CHECK(sigprocmask(SIG_BLOCK, &set, NULL), -1, "disable_interruptions: sigprocmask")
 }
 
 void alarm_handler(int signal)
 {
-    if (can_interrupt())
-    {
-        disable_interruptions();
-        printf("alarm\n");
-        //printf("%p\n", &g_current_thread->addr);
-        thread_yield();
-        enable_interruptions();
-    }
+    disable_interruptions();
+    printf("alarm\n");
+    printf("%p\n", &g_current_thread->addr);
+    thread_yield();
+    enable_interruptions();
 }
 
 
@@ -140,6 +136,12 @@ int thread_yield(void)
     thread *tmp = g_current_thread;
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+
+    /* Reset the timer for the new thread */
+    struct itimerval newtimer;
+    CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "thread_yield: getitimer")
+    newtimer.it_value.tv_usec = TIMESLICE;
+    CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "thread_yield: getitimer")
 
     enable_interruptions();
 
@@ -269,7 +271,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     /* Install alarm_handler as the signal handler for SIGVTALRM */
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = &alarm_handler;
-    CHECK(sigaction(SIGVTALRM, &sa, NULL), -1, "thread_create_main: sigaction")
+    CHECK(sigaction(SIGPROF, &sa, NULL), -1, "thread_create_main: sigaction")
 
     /* Configure the timer to expire after the timeslice */
     timer.it_value.tv_sec = 0;
@@ -278,7 +280,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     timer.it_interval.tv_sec = 0;
     timer.it_interval.tv_usec = TIMESLICE;
     /* Start a virtual timer. It counts down whenever this process is executing */
-    CHECK(setitimer(ITIMER_VIRTUAL, &timer, NULL), -1, "thread_create_main: setitimer")
+    CHECK(setitimer(ITIMER_PROF, &timer, NULL), -1, "thread_create_main: setitimer")
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
