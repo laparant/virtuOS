@@ -1,6 +1,8 @@
 project(VirtuOS)
 cmake_minimum_required(VERSION 2.8)
 
+enable_testing()
+
 set(CMAKE_C_FLAGS "-Wall -g -O0 -lpthread")
 option(USE_PTHREAD "USE_PTHREAD" OFF)
 
@@ -12,5 +14,3 @@ endif()
 add_subdirectory("src")
 add_subdirectory("tst")
 add_subdirectory("examples")
-
-enable_testing()
