@@ -43,6 +43,14 @@ typedef struct thread_base
     int exited;
 } thread_base;
 
+void reset_timer()
+{
+    struct itimerval newtimer;
+    CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "thread_yield: getitimer")
+    newtimer.it_value.tv_usec = TIMESLICE;
+    CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "thread_yield: getitimer")
+}
+
 void enable_interruptions()
 {
     sigset_t set;
@@ -61,11 +69,7 @@ void disable_interruptions()
 
 void alarm_handler(int signal)
 {
-    disable_interruptions();
-    printf("alarm\n");
-    printf("%p\n", &g_current_thread->addr);
     thread_yield();
-    enable_interruptions();
 }
 
 
@@ -138,10 +142,7 @@ int thread_yield(void)
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
     /* Reset the timer for the new thread */
-    struct itimerval newtimer;
-    CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "thread_yield: getitimer")
-    newtimer.it_value.tv_usec = TIMESLICE;
-    CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "thread_yield: getitimer")
+    reset_timer();
 
     enable_interruptions();
 
@@ -204,11 +205,12 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
         g_current_thread = new_current;
         STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
     }
-    /* Yielding to the thread_main,which is exiting */
+    /* Yielding to the thread_main, which is exiting */
     else
     {
         g_current_thread = STAILQ_FIRST(&g_all_threads);
     }
+    reset_timer();
 
     /* Leaving the runqueue */
     if (me != STAILQ_FIRST(&g_all_threads))
@@ -285,7 +287,6 @@ __attribute__ ((constructor)) void thread_create_main (void)
 
 __attribute__ ((destructor)) void thread_exit_main (void)
 {
-
     thread *th;
     thread *me = (thread *) thread_self();
     if (me->addr->exited == 0)
@@ -312,10 +313,12 @@ __attribute__ ((destructor)) void thread_exit_main (void)
             STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
 
             /* Leaving the runqueue */
+            reset_timer();
             CHECK(swapcontext(me->addr->ctx, new_current->addr->ctx), -1, "thread_exit_main: swapcontext")
         }
     }
 
+    disable_interruptions();
     /* Clean everything */
     thread *th2;
     thread *main_thread = g_current_thread;
