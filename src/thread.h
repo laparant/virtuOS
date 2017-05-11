@@ -2,7 +2,7 @@
 #define __THREAD_H__
 
 #ifndef USE_PTHREAD
-
+#include <sys/queue.h>
 __attribute__ ((constructor)) void thread_create_main (void);
 __attribute__ ((destructor)) void thread_exit_main (void);
 
@@ -45,7 +45,11 @@ extern int thread_join(thread_t thread, void **retval);
 extern void thread_exit(void *retval) __attribute__ ((__noreturn__));
 
 /* Interface possible pour les mutex */
-typedef struct thread_mutex { int dummy; } thread_mutex_t;
+typedef struct thread_mutex
+{
+    thread_t possessor;
+    STAILQ_HEAD(thread_list_mutex, thread) sleep_queue;
+} thread_mutex_t;
 int thread_mutex_init(thread_mutex_t *mutex);
 int thread_mutex_destroy(thread_mutex_t *mutex);
 int thread_mutex_lock(thread_mutex_t *mutex);

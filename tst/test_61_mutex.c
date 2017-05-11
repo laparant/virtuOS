@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
 
   /* on les joine tous, maintenant qu'ils sont tous morts */
   for(i=0; i<nb; i++) {
-    err = thread_join(th[i], NULL);
-    assert(!err);
+      err = thread_join(th[i], NULL);
+      assert(!err);
   }
 
   free(th);

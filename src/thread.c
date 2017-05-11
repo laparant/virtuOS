@@ -1,66 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <ucontext.h>
-#include <errno.h>
-#include <sys/queue.h> // Using the singly linked tail queue STAILQ for runq
-#include <valgrind/valgrind.h>
 #include "thread.h"
 
 #ifndef USE_PTHREAD
 #include "retval.h"
 #include "define.h"
-
-#define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
-
-/*
- * ##############################################################################################
- * ######                                Structures                                        ######
- * ##############################################################################################
- */
-typedef struct thread_base thread_base;
-
-typedef struct thread
-{
-    thread_base *addr;
-    STAILQ_ENTRY(thread) runq_entries; // This entry will be used for the runq
-    STAILQ_ENTRY(thread) all_entries; // This entry will be used for the all_threads queue
-    STAILQ_ENTRY(thread) to_free_entries; // This entry will be used for the to_free queue
-} thread;
-
-typedef struct thread_base
-{
-    thread *joinq;
-    struct retval *rv;
-    ucontext_t *ctx;
-    int valgrind_stackid;
-    int status;
-} thread_base;
-
-/*
- * ______________________________________________________________________________________________
- */
-
-/*
- * ##############################################################################################
- * ######                                Static datas                                      ######
- * ##############################################################################################
- */
-
-// The thread that is currently being executed
-static thread * g_current_thread;
-
-// The list of all the threads that were created
-static STAILQ_HEAD(thread_list_all, thread) g_all_threads;
-
-// The run queue
-static STAILQ_HEAD(thread_list_run, thread) g_runq;
-
-// The to free queue
-static STAILQ_HEAD(thread_list_free, thread) g_to_free;
-
-/*
- * ______________________________________________________________________________________________
- */
 
 /*
  * ##############################################################################################
