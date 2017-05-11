@@ -140,7 +140,7 @@ int thread_join(thread_t thread, void **retval)
     struct thread *th = (struct thread *) thread;
 
     /* Search if the thread does exist => error : ESRCH */
-    struct thread *th_i;
+    /*struct thread *th_i;
     STAILQ_FOREACH(th_i, &g_all_threads, all_entries)
     {
         if(th_i == th)
@@ -148,7 +148,7 @@ int thread_join(thread_t thread, void **retval)
         if(STAILQ_NEXT(th_i,all_entries) == NULL)
             return ESRCH;
     }
-
+    */
     /* Detecting the deadlock (the thread is waiting for me) => error : EDEADLK */
     struct thread *me = thread_self();
     if (th == me->addr->sleepq)
