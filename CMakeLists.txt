@@ -1,6 +1,10 @@
 project(VirtuOS)
 cmake_minimum_required(VERSION 2.8)
 
+# Tests
+include (CTest)
+set( CTEST_MEMORYCHECK_COMMAND valgrind )
+  set( CTEST_MEMORYCHECK_COMMAND_OPTIONS "--tool=callgrind -v" )
 enable_testing()
 
 set(CMAKE_C_FLAGS "-Wall -g -O0 -lpthread")

@@ -24,6 +24,7 @@ void *thread1_func()
 void *thread2_func()
 {
     long int S = 0;
+    int preempting_time;
     for (i = 0; i < N; i++)
     {
         gettimeofday(&time1, NULL);
@@ -33,9 +34,10 @@ void *thread2_func()
         if (diff_us < 0)
             diff_us = 1000000 + diff_us;
         S += diff_us;
+        if(i == 0) { preempting_time = diff_us - 12000;} // Calcul de la constante de préemption pour la première itération
     }
     stop = 1;
-    int moy = (int) S/N - 1000; // On retire 4000 car le système préempte
+    int moy = (int) S/N - preempting_time; // On retire la constante de préemption propre à chaque architecture
     printf("Timeslice moyenne: %d\n", moy);
     assert(12000*0.95 < moy && moy < 12000*1.05);
     return NULL;
