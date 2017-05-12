@@ -12,6 +12,7 @@ void *thread1_func()
     {
         gettimeofday(&time1, NULL);
     }
+    return NULL;
 }
 
 void *thread2_func()
@@ -22,6 +23,7 @@ void *thread2_func()
         printf("%ld  %ld\n", time1.tv_sec, time1.tv_usec);
         thread_yield();
     }
+    return NULL;
 }
 
 
