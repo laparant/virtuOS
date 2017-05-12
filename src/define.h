@@ -18,7 +18,7 @@
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
-#define TIMESLICE 8000 // 8 milliseconds in microseconds (Linux clock tick is 4 milliseconds)
+#define TIMESLICE 4000 // 4 milliseconds in microseconds (Linux clock tick is 4 milliseconds)
 
 // Values for status
 #define TO_FREE 2 /*! status for a thread which has terminated and its resources need to be free'd */
@@ -33,9 +33,21 @@
 typedef struct thread_base thread_base;
 typedef struct thread thread;
 
+
+/* If value is even, alternate between higher and lower priority
+ * in order to have a intermediate value in mean.
+ */
+typedef struct priority_t
+{
+    short value; // Between 1 and 10, timeslice between 4ms and 22ms
+    short alternate;
+} priority_t;
+
+
 /**
   * \struct thread
   */
+
 typedef struct thread
 {
     thread_base *addr; /*!< address of the thread */
@@ -50,11 +62,13 @@ typedef struct thread
   */
 typedef struct thread_base
 {
+
     thread *joinq; /*!< thread waiting to be joined */
     struct retval *rv; /*!< return value of the thread after finishing */
     ucontext_t *ctx; /*!< execution context */
     int valgrind_stackid; /*!< nobody knew valgrind could be so complicated */
     int status; /*!< status of the thread; see macros above */
+    priority_t priority;
 } thread_base;
 
 /*

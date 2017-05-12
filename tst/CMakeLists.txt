@@ -71,3 +71,7 @@ target_link_libraries (test_71_preemption thread)
 add_executable(test_72_preemption test_72_preemption.c)
 target_link_libraries (test_72_preemption thread)
 add_test(tst72 test_72_preemption)
+
+# test_81_priority
+add_executable(test_81_priority test_81_priority.c)
+target_link_libraries (test_81_priority thread)

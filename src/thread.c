@@ -36,6 +36,58 @@ void free_join(thread *th)
 
 /*
  * ##############################################################################################
+ * ######                             Priority management                                  ######
+ * ##############################################################################################
+ */
+
+int thread_set_priority(thread_t thread, short priority)
+{
+    /* If priority is not valid, exit */
+    if (priority < 1 || priority > 10)
+    {
+        return EXIT_FAILURE;
+    }
+    else
+    {
+        struct thread *th = (struct thread *) thread;
+        th->addr->priority.value = priority;
+        return EXIT_SUCCESS;
+    }
+}
+
+short thread_get_priority(thread_t thread)
+{
+    struct thread *th = (struct thread *) thread;
+    return th->addr->priority.value;
+}
+
+__useconds_t get_priority_timeslice(thread *th)
+{
+    if (th->addr->priority.value%2 == 1) // priority is an odd value
+    {
+        return TIMESLICE * (th->addr->priority.value/2 + 1);
+    }
+    else // priority is an even value so we need to alternate between higher and lower timeslices
+    {
+        if (th->addr->priority.alternate)
+        {
+            th->addr->priority.alternate = 0;
+            return TIMESLICE * (th->addr->priority.value/2 + 1);
+        }
+        else
+        {
+            th->addr->priority.alternate = 1;
+            return TIMESLICE * (th->addr->priority.value/2);
+        }
+    }
+}
+
+/*
+ * ______________________________________________________________________________________________
+ */
+
+/*
+ * ##############################################################################################
  * ######                             Preemption utilitary                                 ######
  * ##############################################################################################
  */
@@ -44,7 +96,7 @@ void reset_timer()
 {
     struct itimerval newtimer;
     CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "reset_timer: getitimer")
-    newtimer.it_value.tv_usec = TIMESLICE;
+    newtimer.it_value.tv_usec = get_priority_timeslice(g_current_thread);
     CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "reset_timer: getitimer")
 }
 
@@ -194,6 +246,10 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 
     /* Add the thread to the scheduler */
     add_to_scheduler(th);
+
+    /* Give a default priority of 5 */
+    th->addr->priority.value = 5;
+    th->addr->priority.alternate = 0;
 
     /* Giving the return value */
     *newthread = (thread_t) th;

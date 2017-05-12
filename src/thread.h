@@ -89,6 +89,17 @@ int thread_mutex_destroy(thread_mutex_t *mutex);
 int thread_mutex_lock(thread_mutex_t *mutex);
 int thread_mutex_unlock(thread_mutex_t *mutex);
 
+/* Fonction permettant à l'utilisateur de paramétrer la priorité d'un thread
+ * L'argument priority doit être compris entre 1 et 10
+ * La priorité influe sur le temps d'exécution du thread:
+ * -> plus la priorité est élevée, plus la timeslice sera grande
+ * retourne 0 en cas de succès, 1 si la priorité n'est pas valide
+ */
+extern int thread_set_priority(thread_t thread, short priority);
+
+/* Retourne la valeur actuelle de la priorité du thread */
+extern short thread_get_priority(thread_t thread);
+
 #else /* USE_PTHREAD */
 
 /* Si on compile avec -DUSE_PTHREAD, ce sont les pthreads qui sont utilisés */
