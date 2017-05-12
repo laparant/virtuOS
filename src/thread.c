@@ -43,9 +43,9 @@ void free_join(thread *th)
 void reset_timer()
 {
     struct itimerval newtimer;
-    CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "thread_yield: getitimer")
+    CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "reset_timer: getitimer")
     newtimer.it_value.tv_usec = TIMESLICE;
-    CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "thread_yield: getitimer")
+    CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "reset_timer: getitimer")
 }
 
 void enable_interruptions()
@@ -88,7 +88,7 @@ void force_exit(void *(*func)(void *), void *funcarg)
     }
 }
 
-void finalize_join(thread *th, void ** retval)
+void finalize_join(thread *th, void **retval)
 {
     /* Collecting the value of retval */
     if (retval) *retval = get_value(th->addr->rv);
@@ -112,7 +112,7 @@ void finalize_join(thread *th, void ** retval)
  * ##############################################################################################
  */
 
-thread * init_context(void *(*func)(void *), void *funcarg)
+thread *init_context(void *(*func)(void *), void *funcarg)
 {
     thread *th = malloc(sizeof(thread));
     CHECK(th, NULL, "init_context: thread pointer malloc")
@@ -134,7 +134,7 @@ thread * init_context(void *(*func)(void *), void *funcarg)
     return th;
 }
 
-void add_to_scheduler(thread * th)
+void add_to_scheduler(thread *th)
 {
     /* Insert the current thread in the run queue */
     STAILQ_INSERT_TAIL(&g_runq, th, runq_entries);
@@ -152,7 +152,7 @@ void add_to_scheduler(thread * th)
  * ##############################################################################################
  */
 
-int is_existing(thread * th)
+int is_existing(thread *th)
 {
     struct thread *th_i;
     STAILQ_FOREACH(th_i, &g_all_threads, all_entries)
@@ -304,7 +304,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
     /* Main */
     else
     {
-        CHECK(swapcontext(me->addr->ctx, g_current_thread->addr->ctx), -1, "thread_exit_main: swapcontext")
+        CHECK(swapcontext(me->addr->ctx, g_current_thread->addr->ctx), -1, "thread_exit: swapcontext")
     }
     exit(EXIT_SUCCESS);
 }
@@ -319,7 +319,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
  * ##############################################################################################
  */
 
-__attribute__ ((constructor)) void thread_create_main (void)
+__attribute__ ((constructor)) void thread_create_main(void)
 { 
     /* Initialization of the context */
     thread *th = init_context(NULL, NULL);
@@ -360,7 +360,7 @@ __attribute__ ((constructor)) void thread_create_main (void)
     CHECK(setitimer(ITIMER_PROF, &timer, NULL), -1, "thread_create_main: setitimer")
 }
 
-__attribute__ ((destructor)) void thread_exit_main (void)
+__attribute__ ((destructor)) void thread_exit_main(void)
 {
     thread *th;
     thread *me = (thread *) thread_self();

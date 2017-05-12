@@ -58,7 +58,7 @@ typedef struct thread_base
  */
 
 // The thread that is currently being executed
-thread * g_current_thread;
+thread *g_current_thread;
 
 // The list of all the threads that were created
 STAILQ_HEAD(thread_list_all, thread) g_all_threads;
