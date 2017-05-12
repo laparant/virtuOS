@@ -29,7 +29,6 @@ int main()
 {
     thread_t thread1;
     thread_t thread2;
-    void *res;
     thread_create(&thread1, thread1_func, NULL);
     thread_create(&thread2, thread2_func, NULL);
     return 0;
