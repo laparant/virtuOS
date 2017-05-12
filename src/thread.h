@@ -11,18 +11,39 @@ __attribute__ ((destructor)) void thread_exit_main (void);
  *     mais attention aux inconvénient des tableaux de threads
  *     (consommation mémoire, cout d'allocation, ...).
  */
+/*!
+ * \brief thread_t thread identifier
+ */
 typedef void *thread_t;
 
 /* recuperer l'identifiant du thread courant.
+ */
+/*!
+ * \fn extern thread_t thread_self(void)
+ * \brief get the identifier of the current thread
+ * \return identifier of the current thread
  */
 extern thread_t thread_self(void);
 
 /* creer un nouveau thread qui va exécuter la fonction func avec l'argument funcarg.
  * renvoie 0 en cas de succès, -1 en cas d'erreur.
  */
+/*!
+ * \brief creates a new thread running the function func with arg funcarg
+ * \fn extern int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg);
+ * \param newthread
+ * \param func the function to run
+ * \param funcarg the arguments to func
+ * \return 0 on success, -1 on error
+ */
 extern int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg);
 
 /* passer la main à un autre thread.
+ */
+/*!
+ * \brief yield to another thread
+ * \fn extern int thread_yield(void);
+ * \return ?
  */
 extern int thread_yield(void);
 
@@ -31,6 +52,14 @@ extern int thread_yield(void);
  * si retval est NULL, la valeur de retour est ignorée.
  * /!\on peut join qu'un thread
  * si on join un thread non initialisé avec thread_create ou non existant le comportement sera indéfini
+ */
+/*!
+ * \brief wait for a thread to finish
+ * only one join can be done per thread. If a join is made on a non-existing thread (i.e not created with thread_create) the comportment will be undefined.
+ * \fn extern int thread_join(thread_t thread, void **retval);
+ * \param thread
+ * \param retval
+ * \return
  */
 extern int thread_join(thread_t thread, void **retval);
 
@@ -41,6 +70,11 @@ extern int thread_join(thread_t thread, void **retval);
  * l'application (élimination de code mort). Attention à ne pas mettre
  * cet attribut dans votre interface tant que votre thread_exit()
  * n'est pas correctement implémenté (il ne doit jamais retourner).
+ */
+/*!
+ * \brief exiting the current thread and returning retval
+ * \fn extern void thread_exit(void *retval) __attribute__ ((__noreturn__));
+ * \param retval
  */
 extern void thread_exit(void *retval) __attribute__ ((__noreturn__));
 
