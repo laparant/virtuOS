@@ -7,7 +7,7 @@ set(SRCS thread.c retval.c mutex.c)
 # Creation of the library libthread.so
 add_library(thread SHARED ${HDRS} ${SRCS})
 
-# Install the library and thread.h
+# Install the library and thread.h (only with root privileges)
 INSTALL(TARGETS thread
         DESTINATION lib
         PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
