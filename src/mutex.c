@@ -12,7 +12,7 @@ int thread_mutex_init(thread_mutex_t *mutex)
 
 int thread_mutex_destroy(thread_mutex_t *mutex)
 {
-    if(STAILQ_EMPTY(&(mutex->sleep_queue)))
+    if (STAILQ_EMPTY(&(mutex->sleep_queue)))
     {
         mutex = DESTROYED_MUTEX;
         return EXIT_SUCCESS;
@@ -24,11 +24,11 @@ int thread_mutex_destroy(thread_mutex_t *mutex)
 int thread_mutex_lock(thread_mutex_t *mutex)
 {
     // Detecting destroyed mutex
-    if(mutex == NULL)
+    if (mutex == NULL)
         return EXIT_FAILURE;
 
     /* Unvailable mutex : waiting for the mutex */
-    while(mutex->possessor != NULL)
+    while (mutex->possessor != NULL)
     {
         thread *me = thread_self();
         STAILQ_INSERT_TAIL(&(mutex->sleep_queue), me, mutex_queue_entries);
@@ -46,15 +46,15 @@ int thread_mutex_lock(thread_mutex_t *mutex)
 int thread_mutex_unlock(thread_mutex_t *mutex)
 {
     // Detecting destroyed mutex
-    if(mutex == NULL)
+    if (mutex == NULL)
         return EXIT_FAILURE;
 
     /* I'm not the possessor */
-    if(mutex->possessor != thread_self()) return EXIT_FAILURE;
+    if (mutex->possessor != thread_self()) return EXIT_FAILURE;
 
     /* I'm the possessor */
     // Waking up the next thread waiting for the mutex */
-    if(!STAILQ_EMPTY(&(mutex->sleep_queue)))
+    if (!STAILQ_EMPTY(&(mutex->sleep_queue)))
     {
         thread *next = STAILQ_FIRST(&(mutex->sleep_queue));
         STAILQ_REMOVE_HEAD(&(mutex->sleep_queue), mutex_queue_entries);

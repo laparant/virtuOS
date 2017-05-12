@@ -14,7 +14,7 @@
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
-#define TIMESLICE 8000 // 8 milliseconds in microseconds (Linux clock tick is 4milliseconds)
+#define TIMESLICE 8000 // 8 milliseconds in microseconds (Linux clock tick is 4 milliseconds)
 
 // Values for status
 #define TO_FREE 2
@@ -53,7 +53,7 @@ typedef struct thread_base
 
 /*
  * ##############################################################################################
- * ######                                Static datas                                      ######
+ * ######                                Static data                                       ######
  * ##############################################################################################
  */
 

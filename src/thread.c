@@ -21,8 +21,10 @@ void free_context(thread *th)
 
 void free_join(thread *th)
 {
-    if(th->addr->status == TO_FREE)
+    if (th->addr->status == TO_FREE)
+    {
         free_context(th);
+    }
     free_retval(th->addr->rv);
     free(th->addr);
     free(th);
@@ -155,9 +157,9 @@ int is_existing(thread * th)
     struct thread *th_i;
     STAILQ_FOREACH(th_i, &g_all_threads, all_entries)
     {
-        if(th_i == th)
+        if (th_i == th)
             break;
-        if(STAILQ_NEXT(th_i,all_entries) == NULL)
+        if (STAILQ_NEXT(th_i, all_entries) == NULL)
             return ESRCH;
     }
 
@@ -182,7 +184,7 @@ thread_t thread_self(void)
 int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 {
     /* Initialization of the context */
-    thread * th = init_context(func, funcarg);
+    thread *th = init_context(func, funcarg);
 
     /* Initialization of the return value */
     th->addr->rv = init_retval();
@@ -276,7 +278,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
     if (retval) me->addr->rv->value = retval;
 
     /* Waking up the thread waiting for me */
-    if(me->addr->joinq != NULL)
+    if (me->addr->joinq != NULL)
         STAILQ_INSERT_TAIL(&g_runq, me->addr->joinq, runq_entries);
 
     /* Yielding to next thread if others threads are running*/
@@ -371,7 +373,7 @@ __attribute__ ((destructor)) void thread_exit_main (void)
         // could not be done because no retval : find a solution
 
         /* Waking up the thread waiting for me */
-        if(me->addr->joinq != NULL)
+        if (me->addr->joinq != NULL)
             STAILQ_INSERT_TAIL(&g_runq, me->addr->joinq, runq_entries);
 
         /* If others threads are running */
@@ -394,7 +396,7 @@ __attribute__ ((destructor)) void thread_exit_main (void)
 
     /* Free the context of the threads exited remaing */
     th = STAILQ_FIRST(&g_to_free);
-    while(th != NULL)
+    while (th != NULL)
     {
         th2 = STAILQ_NEXT(th, to_free_entries);
         if (th != main_thread)
