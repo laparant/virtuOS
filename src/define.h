@@ -15,6 +15,7 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <string.h>
+#include <unistd.h>
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
@@ -91,6 +92,11 @@ STAILQ_HEAD(thread_list_run, thread) g_runq;
  * \var g_to_free the to free queue
  */
 STAILQ_HEAD(thread_list_free, thread) g_to_free;
+
+/**
+ * @brief set the signal set of the scheduler
+ */
+sigset_t set;
 
 /*
  * ______________________________________________________________________________________________

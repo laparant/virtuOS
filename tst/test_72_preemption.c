@@ -34,12 +34,13 @@ void *thread2_func()
         if (diff_us < 0)
             diff_us = 1000000 + diff_us;
         S += diff_us;
+        printf("%f\n",diff_us);
         if(i == 0) { preempting_time = diff_us - 12000;} // Calcul de la constante de préemption pour la première itération
     }
     stop = 1;
     int moy = (int) S/N - preempting_time; // On retire la constante de préemption propre à chaque architecture
     printf("Timeslice moyenne: %d\n", moy);
-    assert(12000*0.95 < moy && moy < 12000*1.05);
+    assert(12000*0.95 < moy && moy < 12000*1.05); // 12000 is the timeslice expected for a normal priority
     return NULL;
 }
 

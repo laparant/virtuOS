@@ -101,23 +101,19 @@ void reset_timer()
 
 void enable_interruptions()
 {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGPROF);
     CHECK(sigprocmask(SIG_UNBLOCK, &set, NULL), -1, "enable_interruptions: sigprocmask")
 }
 
 void disable_interruptions()
 {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGPROF);
     CHECK(sigprocmask(SIG_BLOCK, &set, NULL), -1, "disable_interruptions: sigprocmask")
 }
 
 void alarm_handler(int signal)
 {
-    thread_yield();
+    disable_interruptions();
+    if(!STAILQ_EMPTY(&g_runq)) {thread_yield();}
+    enable_interruptions();
 }
 
 /*
@@ -134,6 +130,7 @@ void force_exit(void *(*func)(void *), void *funcarg)
 {
     if (func != NULL)
     {
+        enable_interruptions();
         void *res = func(funcarg);
         thread_exit(res);
     }
@@ -171,7 +168,8 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     CHECK(th->ctx, NULL, "init_context: context malloc")
     getcontext(th->ctx);
 
-    th->ctx->uc_stack.ss_size = 64 * 1024;
+    long pageSize = sysconf(_SC_PAGESIZE); printf("pageSize : %ld\n",pageSize);
+    th->ctx->uc_stack.ss_size = 64 * pageSize;
     th->ctx->uc_stack.ss_sp = malloc(th->ctx->uc_stack.ss_size);
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->ctx->uc_stack.ss_sp,
                                                    th->ctx->uc_stack.ss_sp + th->ctx->uc_stack.ss_size);
@@ -232,6 +230,7 @@ thread_t thread_self(void)
 
 int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 {
+    disable_interruptions();
     /* Initialization of the context */
     thread *th = init_context(func, funcarg);
 
@@ -275,11 +274,10 @@ int thread_yield(void)
     /* Swapping contexes */
     thread *tmp = g_current_thread;
     g_current_thread = new_current;
-    CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_yield: swapcontext")
 
     /* Reset the timer for the new thread */
     reset_timer();
-
+    CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_yield: swapcontext")
     enable_interruptions();
 
     return EXIT_SUCCESS;
@@ -304,26 +302,34 @@ int thread_join(thread_t thread, void **retval)
     /* If the thread has already finished */
     if (th->status != RUNNING)
     {
+        disable_interruptions();
         finalize_join(th, retval);
+        enable_interruptions();
         return EXIT_SUCCESS;
     }
 
     /* If the thread is alive */
     /* Sleeping while the thread hasn't finished */
+    disable_interruptions();
     th->joinq = me;
     struct thread *new_current = STAILQ_FIRST(&g_runq);
     STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
     struct thread *tmp = g_current_thread;
     g_current_thread = new_current;
+    reset_timer();
     CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_join: swapcontext")
+    enable_interruptions();
 
     /* When woke up (thread is finished) */
+    disable_interruptions();
     finalize_join(th, retval);
+    enable_interruptions();
     return EXIT_SUCCESS;
 }
 
 __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 {
+    disable_interruptions();
     thread *me = (thread *) thread_self();
     me->status = TO_FREE;
 
@@ -413,8 +419,10 @@ __attribute__ ((constructor)) void thread_create_main(void)
     timer.it_interval.tv_sec = 0;
     timer.it_interval.tv_usec = TIMESLICE;
     /* Start a virtual timer. It counts down whenever this process is executing */
-    enable_interruptions();
+    sigemptyset(&set);
+    sigaddset(&set, SIGPROF);
     CHECK(setitimer(ITIMER_PROF, &timer, NULL), -1, "thread_create_main: setitimer")
+    enable_interruptions();
 }
 
 __attribute__ ((destructor)) void thread_exit_main(void)
@@ -423,11 +431,12 @@ __attribute__ ((destructor)) void thread_exit_main(void)
     thread *me = (thread *) thread_self();
     if (me->status == RUNNING)
     {
+        disable_interruptions();
         me->status = TO_FREE;
 
         /* Set the retval */
         //if (retval) me->rv->value = retval;
-        // could not be done because no retval : find a solution
+        // could not be done because no retval when main just does "return" and we can't use force_exit
 
         /* Waking up the thread waiting for me */
         if (me->joinq != NULL)
@@ -444,6 +453,7 @@ __attribute__ ((destructor)) void thread_exit_main(void)
             reset_timer();
             CHECK(swapcontext(me->ctx, new_current->ctx), -1, "thread_exit_main: swapcontext")
         }
+        enable_interruptions();
     }
 
     disable_interruptions();
