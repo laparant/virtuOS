@@ -14,7 +14,7 @@
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
-#define TIMESLICE 8000 // 8 milliseconds in microseconds (Linux clock tick is 4 milliseconds)
+#define TIMESLICE 4000 // 4 milliseconds in microseconds (Linux clock tick is 4 milliseconds)
 
 // Values for status
 #define TO_FREE 2
@@ -28,6 +28,15 @@
  */
 typedef struct thread_base thread_base;
 typedef struct thread thread;
+
+/* If value is even, alternate between higher and lower priority
+ * in order to have a intermediate value in mean.
+ */
+typedef struct priority_t
+{
+    short value; // Between 1 and 10, timeslice between 4ms and 22ms
+    short alternate;
+} priority_t;
 
 typedef struct thread
 {
@@ -45,6 +54,7 @@ typedef struct thread_base
     ucontext_t *ctx;
     int valgrind_stackid;
     int status;
+    priority_t priority;
 } thread_base;
 
 /*
