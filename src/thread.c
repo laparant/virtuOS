@@ -42,6 +42,7 @@ void free_join(thread *th)
 
 int thread_set_priority(thread_t thread, short priority)
 {
+    /* If priority is not valid, exit */
     if (priority < 1 || priority > 10)
     {
         return EXIT_FAILURE;
@@ -62,11 +63,11 @@ short thread_get_priority(thread_t thread)
 
 __useconds_t get_priority_timeslice(thread *th)
 {
-    if (th->addr->priority.value%2 == 1)
+    if (th->addr->priority.value%2 == 1) // priority is an odd value
     {
         return TIMESLICE * (th->addr->priority.value/2 + 1);
     }
-    else
+    else // priority is an even value so we need to alternate between higher and lower timeslices
     {
         if (th->addr->priority.alternate)
         {
