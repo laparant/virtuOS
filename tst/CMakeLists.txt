@@ -71,3 +71,8 @@ target_link_libraries (test_71_preemption thread)
 add_executable(test_72_preemption test_72_preemption.c)
 target_link_libraries (test_72_preemption thread)
 add_test(tst72 test_72_preemption)
+
+# test_91_segfault
+add_executable(test_91_segfault test_91_segfault.c)
+target_link_libraries (test_91_segfault thread)
+add_test(tst91 test_91_segfault)
