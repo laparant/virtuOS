@@ -383,6 +383,10 @@ __attribute__ ((constructor)) void thread_create_main(void)
     /* Initialize the thread's sleep queue */
     th->joinq = NULL;
 
+    /* Give a default priority of 5 */
+    th->priority.value = 5;
+    th->priority.alternate = 0;
+
     /* Initialization of the queues */
     STAILQ_INIT(&g_all_threads);
     STAILQ_INIT(&g_runq);
