@@ -53,6 +53,14 @@ extern int thread_yield(void);
  * /!\on peut join qu'un thread
  * si on join un thread non initialisé avec thread_create ou non existant le comportement sera indéfini
  */
+/*!
+ * \brief wait for a thread to finish
+ * only one join can be done per thread. If a join is made on a non-existing thread (i.e not created with thread_create) the comportment will be undefined.
+ * \fn extern int thread_join(thread_t thread, void **retval);
+ * \param thread
+ * \param retval
+ * \return
+ */
 extern int thread_join(thread_t thread, void **retval);
 
 /* terminer le thread courant en renvoyant la valeur de retour retval.
@@ -62,6 +70,11 @@ extern int thread_join(thread_t thread, void **retval);
  * l'application (élimination de code mort). Attention à ne pas mettre
  * cet attribut dans votre interface tant que votre thread_exit()
  * n'est pas correctement implémenté (il ne doit jamais retourner).
+ */
+/*!
+ * \brief exiting the current thread and returning retval
+ * \fn extern void thread_exit(void *retval) __attribute__ ((__noreturn__));
+ * \param retval
  */
 extern void thread_exit(void *retval) __attribute__ ((__noreturn__));
 
