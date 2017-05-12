@@ -25,6 +25,8 @@
 #define ALREADY_FREE 1 /*! status for a thead which has terminated and is destroyed */
 #define RUNNING 0 /*! status for a running thread */
 
+#define DESTROYED_MUTEX NULL
+
 /*
  * ##############################################################################################
  * ######                                Structures                                        ######
