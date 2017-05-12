@@ -114,6 +114,8 @@ void finalize_join(thread *th, void **retval)
 
 thread *init_context(void *(*func)(void *), void *funcarg)
 {
+    int pageSize = sysconf(_SC_PAGE_SIZE);
+
     thread *th = malloc(sizeof(thread));
     CHECK(th, NULL, "init_context: thread pointer malloc")
     th->addr = malloc(sizeof(thread_base));
@@ -122,11 +124,19 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     CHECK(th->addr->ctx, NULL, "init_context: context malloc")
     getcontext(th->addr->ctx);
 
-    th->addr->ctx->uc_stack.ss_size = 64 * 1024;
+    th->addr->ctx->uc_stack.ss_size = 64 * pageSize;
     th->addr->ctx->uc_stack.ss_sp = malloc(th->addr->ctx->uc_stack.ss_size);
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
+
+    void * first_addr = (th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
+
+    //printf("psize \t%p\n", pointer_size);
+    printf("first addr \t%p\n", first_addr);
+
+    CHECK(mprotect(first_addr, 1024, PROT_NONE),-1, "init_context : mprotect")
+
     th->addr->status = RUNNING;
     th->addr->ctx->uc_link = NULL;
     makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, func, funcarg);

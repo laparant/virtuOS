@@ -11,6 +11,8 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
