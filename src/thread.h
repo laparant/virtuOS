@@ -11,18 +11,39 @@ __attribute__ ((destructor)) void thread_exit_main (void);
  *     mais attention aux inconvénient des tableaux de threads
  *     (consommation mémoire, cout d'allocation, ...).
  */
+/*!
+ * \brief thread_t thread identifier
+ */
 typedef void *thread_t;
 
 /* recuperer l'identifiant du thread courant.
+ */
+/*!
+ * \fn extern thread_t thread_self(void)
+ * \brief get the identifier of the current thread
+ * \return identifier of the current thread
  */
 extern thread_t thread_self(void);
 
 /* creer un nouveau thread qui va exécuter la fonction func avec l'argument funcarg.
  * renvoie 0 en cas de succès, -1 en cas d'erreur.
  */
+/*!
+ * \brief creates a new thread running the function func with arg funcarg
+ * \fn extern int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg);
+ * \param newthread
+ * \param func the function to run
+ * \param funcarg the arguments to func
+ * \return 0 on success, -1 on error
+ */
 extern int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg);
 
 /* passer la main à un autre thread.
+ */
+/*!
+ * \brief yield to another thread
+ * \fn extern int thread_yield(void);
+ * \return ?
  */
 extern int thread_yield(void);
 
