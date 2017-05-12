@@ -13,6 +13,7 @@ struct timeval time2;
 int i;
 int stop = 0;
 short thread1_priority;
+int timeslice = 4000;
 
 void *thread1_func()
 {
@@ -37,9 +38,22 @@ void *thread2_func()
         S += diff_us;
     }
     stop = 1;
-    int moy = (int) S/N - 4000; // On retire 4000 car le système préempte
+    int moy = (int) S/N - 1000; // On retire 4000 car le système préempte
     printf("Priorité du thread: %u, Timeslice moyenne: %d\n", thread1_priority, moy);
-    //assert(12000*0.95 < moy && moy < 12000*1.05);
+    int t,t1;
+    int switch_cond = thread1_priority%2;
+    switch(switch_cond){
+    case 1:
+      t = timeslice * (thread1_priority/2+1);
+      assert(t*0.95 < moy && moy < t*1.05);
+      break;
+    default:
+      t = timeslice * (thread1_priority/2+1);
+      t1 = timeslice * (thread1_priority/2);
+      t = (t+t1)/2;
+      assert(t*0.95 < moy && moy < t*1.05);
+      break;
+    }
     return NULL;
 }
 
