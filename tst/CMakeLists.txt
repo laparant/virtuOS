@@ -62,3 +62,12 @@ add_test(tst51 test51 ${FIBO})
 add_executable(test61 test_61_mutex.c)
 target_link_libraries (test61 thread)
 add_test(tst61 test61 ${NB_THREADS})
+
+# test_71_preemption
+add_executable(test_71_preemption test_71_preemption.c)
+target_link_libraries (test_71_preemption thread)
+
+# test_72_preemption
+add_executable(test_72_preemption test_72_preemption.c)
+target_link_libraries (test_72_preemption thread)
+add_test(tst72 test_72_preemption)

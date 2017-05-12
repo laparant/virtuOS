@@ -34,13 +34,52 @@ void free_join(thread *th)
 
 /*
  * ##############################################################################################
+ * ######                             Preemption utilitary                                 ######
+ * ##############################################################################################
+ */
+
+void reset_timer()
+{
+    struct itimerval newtimer;
+    CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "thread_yield: getitimer")
+    newtimer.it_value.tv_usec = TIMESLICE;
+    CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "thread_yield: getitimer")
+}
+
+void enable_interruptions()
+{
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGPROF);
+    CHECK(sigprocmask(SIG_UNBLOCK, &set, NULL), -1, "enable_interruptions: sigprocmask")
+}
+
+void disable_interruptions()
+{
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGPROF);
+    CHECK(sigprocmask(SIG_BLOCK, &set, NULL), -1, "disable_interruptions: sigprocmask")
+}
+
+void alarm_handler(int signal)
+{
+    thread_yield();
+}
+
+/*
+ * ______________________________________________________________________________________________
+ */
+
+/*
+ * ##############################################################################################
  * ######                            Auxiliary processes                                   ######
  * ##############################################################################################
  */
 
 void force_exit(void *(*func)(void *), void *funcarg)
 {
-    if(func != NULL)
+    if (func != NULL)
     {
         void *res = func(funcarg);
         thread_exit(res);
@@ -53,10 +92,11 @@ void finalize_join(thread *th, void ** retval)
     if (retval) *retval = get_value(th->addr->rv);
 
     /* If not thread main free the resources */
-    if(th != STAILQ_FIRST(&g_all_threads)) {
-      // Removing the thread from the threads joignable
-      STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
-      free_join(th);
+    if (th != STAILQ_FIRST(&g_all_threads))
+    {
+        // Removing the thread from the threads joignable
+        STAILQ_REMOVE(&g_all_threads, th, thread, all_entries);
+        free_join(th);
     }
 }
 
@@ -156,11 +196,15 @@ int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
     /* Giving the return value */
     *newthread = (thread_t) th;
 
+    enable_interruptions();
+
     return EXIT_SUCCESS;
 }
 
 int thread_yield(void)
 {
+    disable_interruptions();
+
     /* Free the processes waiting to be freed */
     struct thread *th_i;
     STAILQ_FOREACH(th_i, &g_to_free, to_free_entries)
@@ -177,6 +221,11 @@ int thread_yield(void)
     thread *tmp = g_current_thread;
     g_current_thread = new_current;
     CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
+
+    /* Reset the timer for the new thread */
+    reset_timer();
+
+    enable_interruptions();
 
     return EXIT_SUCCESS;
 }
@@ -237,11 +286,12 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
         g_current_thread = new_current;
         STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
     }
-    /* Yielding to the thread_main,which is exiting */
+    /* Yielding to the thread_main, which is exiting */
     else
     {
         g_current_thread = STAILQ_FIRST(&g_all_threads);
     }
+    reset_timer();
 
     /* Leaving the runqueue */
     if (me != STAILQ_FIRST(&g_all_threads))
@@ -268,7 +318,7 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
  */
 
 __attribute__ ((constructor)) void thread_create_main (void)
-{
+{ 
     /* Initialization of the context */
     thread *th = init_context(NULL, NULL);
 
@@ -286,11 +336,30 @@ __attribute__ ((constructor)) void thread_create_main (void)
     /* Add the thread to the scheduler */
     g_current_thread = th;
     STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
+
+    /* ---- Setting up the alarm for preemption ---- */
+
+    struct sigaction sa;
+    struct itimerval timer;
+
+    /* Install alarm_handler as the signal handler for SIGVTALRM */
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &alarm_handler;
+    CHECK(sigaction(SIGPROF, &sa, NULL), -1, "thread_create_main: sigaction")
+
+    /* Configure the timer to expire after the timeslice */
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = TIMESLICE;
+    /* ... and after every timeslice after that */
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = TIMESLICE;
+    /* Start a virtual timer. It counts down whenever this process is executing */
+    enable_interruptions();
+    CHECK(setitimer(ITIMER_PROF, &timer, NULL), -1, "thread_create_main: setitimer")
 }
 
 __attribute__ ((destructor)) void thread_exit_main (void)
 {
-
     thread *th;
     thread *me = (thread *) thread_self();
     if (me->addr->status == RUNNING)
@@ -313,10 +382,12 @@ __attribute__ ((destructor)) void thread_exit_main (void)
             STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
 
             /* Leaving the runqueue */
+            reset_timer();
             CHECK(swapcontext(me->addr->ctx, new_current->addr->ctx), -1, "thread_exit_main: swapcontext")
         }
     }
 
+    disable_interruptions();
     /* Clean everything */
     thread *main_thread = g_current_thread;
     thread *th2;

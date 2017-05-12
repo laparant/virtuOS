@@ -8,8 +8,13 @@
 #include <errno.h>
 #include <sys/queue.h> // Using the singly linked tail queue STAILQ for runq
 #include <valgrind/valgrind.h>
+#include <sys/time.h>
+#include <signal.h>
+#include <string.h>
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
+
+#define TIMESLICE 8000 // 8 milliseconds in microseconds (Linux clock tick is 4milliseconds)
 
 // Values for status
 #define TO_FREE 2
