@@ -35,7 +35,7 @@ void *thread2_func()
         S += diff_us;
     }
     stop = 1;
-    int moy = (int) S/N - 4000; // On retire 4000 car le système préempte
+    int moy = (int) S/N - 1000; // On retire 4000 car le système préempte
     printf("Timeslice moyenne: %d\n", moy);
     assert(12000*0.95 < moy && moy < 12000*1.05);
     return NULL;

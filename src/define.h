@@ -32,9 +32,6 @@
  * ######                                Structures                                        ######
  * ##############################################################################################
  */
-typedef struct thread_base thread_base;
-typedef struct thread thread;
-
 
 /* If value is even, alternate between higher and lower priority
  * in order to have a intermediate value in mean.
@@ -49,21 +46,13 @@ typedef struct priority_t
 /**
   * \struct thread
   */
-
+typedef struct thread thread;
 typedef struct thread
 {
-    thread_base *addr; /*!< address of the thread */
     STAILQ_ENTRY(thread) runq_entries; /*!< entry for the runq */
     STAILQ_ENTRY(thread) all_entries; /*!< entry for the all_threads queue */
     STAILQ_ENTRY(thread) to_free_entries; /*!< entry for the to_free queue */
     STAILQ_ENTRY(thread) mutex_queue_entries; /*!< this entry will be used by the mutex */
-} thread;
-
-/**
-  * \struct thread_base
-  */
-typedef struct thread_base
-{
 
     thread *joinq; /*!< thread waiting to be joined */
     struct retval *rv; /*!< return value of the thread after finishing */
@@ -71,7 +60,7 @@ typedef struct thread_base
     int valgrind_stackid; /*!< nobody knew valgrind could be so complicated */
     int status; /*!< status of the thread; see macros above */
     priority_t priority;
-} thread_base;
+} thread;
 
 /*
  * ______________________________________________________________________________________________

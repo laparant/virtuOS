@@ -34,7 +34,7 @@ int thread_mutex_lock(thread_mutex_t *mutex)
         STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
         thread *tmp = g_current_thread;
         g_current_thread = new_current;
-        CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_mutex_lock: swapcontext")
+        CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_mutex_lock: swapcontext")
     }
     /* Available mutex */
     mutex->possessor = thread_self();
