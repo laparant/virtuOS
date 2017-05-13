@@ -12,6 +12,10 @@ struct timeval time2;
 int i;
 int stop = 0;
 
+int getpreemptingtime(int time) {
+    return ((time%12000 + 500)/1000)*1000;
+}
+
 void *thread1_func()
 {
     while (!stop)
@@ -34,12 +38,12 @@ void *thread2_func()
         if (diff_us < 0)
             diff_us = 1000000 + diff_us;
         S += diff_us;
-        printf("%f\n",diff_us);
-        if(i == 0) { preempting_time = diff_us - 12000;} // Calcul de la constante de préemption pour la première itération
+        //printf("%f\n",diff_us);
+        if(i == 0) { preempting_time = getpreemptingtime(diff_us);} // Calculate the preemption constant while the first iteration
     }
     stop = 1;
-    int moy = (int) S/N - preempting_time; // On retire la constante de préemption propre à chaque architecture
-    printf("Timeslice moyenne: %d\n", moy);
+    int moy = (int) S/N - preempting_time; // Removing the "preemption constant" specific to each architecture
+    printf("Timeslice moyenne: %d (wanted : 12000)\n", moy);
     assert(12000*0.95 < moy && moy < 12000*1.05); // 12000 is the timeslice expected for a normal priority
     return NULL;
 }
