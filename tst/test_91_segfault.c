@@ -7,7 +7,7 @@
 #include "../src/thread.h"
 
 void * recursivity(void* arg) {
-    printf("%p\n", &arg);
+    //printf("%p\n", &arg);
     return recursivity(NULL);
 }
 

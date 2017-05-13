@@ -24,6 +24,7 @@
 
 #define TIMESLICE 4000 // 4 milliseconds in microseconds (Linux clock tick is 4 milliseconds)
 #define NB_PAGES 64 // the number of pages allocated for a thread stack
+#define PAGE_SIZE sysconf(_SC_PAGE_SIZE)
 
 // Values for status
 #define TO_FREE 2 /*! status for a thread which has terminated and its resources need to be free'd */
