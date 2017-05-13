@@ -33,8 +33,7 @@
 
 #define DESTROYED_MUTEX NULL
 
-// Segfault
-#define SEGFAULT "segfault"
+#define SEGFAULT (void *) 0xdead
 
 /*
  * ##############################################################################################
@@ -103,8 +102,14 @@ STAILQ_HEAD(thread_list_free, thread) g_to_free;
 
 /**
  * @brief set the signal set of the scheduler
+ * Just SIGPROF in our case
  */
 sigset_t set;
+
+/**
+ * @brief segv_stack is the stack used for the sefgault signal
+ */
+stack_t segv_stack;
 
 /*
  * ______________________________________________________________________________________________

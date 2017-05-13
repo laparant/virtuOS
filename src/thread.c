@@ -14,6 +14,7 @@ void free_context(thread *th)
     STAILQ_REMOVE(&g_to_free, th, thread, to_free_entries);
     /* Free the resources */
     VALGRIND_STACK_DEREGISTER(th->valgrind_stackid);
+    CHECK(mprotect(th->ctx->uc_stack.ss_sp, 2*PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC),-1, "init_context : mprotect")
     free(th->ctx->uc_stack.ss_sp);
     free(th->ctx);
     th->status = ALREADY_FREE;
@@ -425,11 +426,11 @@ __attribute__ ((constructor)) void thread_create_main(void)
     STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
 
     /* ---- Setting up the segfault handler ---- */
-    stack_t segv_stack;
     segv_stack.ss_sp = valloc(SIGSTKSZ);
     segv_stack.ss_flags = 0;
     segv_stack.ss_size = SIGSTKSZ;
     sigaltstack(&segv_stack, NULL);
+    mprotect(segv_stack.ss_sp,SIGSTKSZ,PROT_READ|PROT_WRITE|PROT_EXEC);
 
     struct sigaction action;
     bzero(&action, sizeof(action));
@@ -437,6 +438,7 @@ __attribute__ ((constructor)) void thread_create_main(void)
     action.sa_sigaction = &sigsegv_handler;
     sigaction(SIGSEGV, &action, NULL);
 
+    stack_overflow();
 
     /* ---- Setting up the alarm for preemption ---- */
 
@@ -524,10 +526,13 @@ __attribute__ ((destructor)) void thread_exit_main(void)
     }
 
     VALGRIND_STACK_DEREGISTER(main_thread->valgrind_stackid);
+    mprotect(main_thread->ctx->uc_stack.ss_sp,PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC);
     free(main_thread->ctx->uc_stack.ss_sp);
     free(main_thread->ctx);
     free_retval(main_thread->rv);
     free(main_thread);
+
+    free(segv_stack.ss_sp);
 
     STAILQ_INIT(&g_all_threads);
 }
