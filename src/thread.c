@@ -125,17 +125,23 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     getcontext(th->addr->ctx);
 
     th->addr->ctx->uc_stack.ss_size = 64 * pageSize;
-    th->addr->ctx->uc_stack.ss_sp = malloc(th->addr->ctx->uc_stack.ss_size);
+    th->addr->ctx->uc_stack.ss_sp = aligned_alloc(pageSize, th->addr->ctx->uc_stack.ss_size);
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
                                                    th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
     th->addr->valgrind_stackid=valgrind_stackid;
 
-    void * first_addr = (th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
+    //void * first_addr = (th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
+    void * last_addr = (th->addr->ctx->uc_stack.ss_sp);
+    //printf("ss_sp + ss_size \t%p\n", first_addr);
+    //printf("ss_sp \t\t%p\n", last_addr);
+    //last_addr-=pageSize;
+    //printf("ss_sp - 4096 \t%p\n", last_addr);
 
-    //printf("psize \t%p\n", pointer_size);
-    printf("first addr \t%p\n", first_addr);
+    //first_addr+=pageSize;
+    //printf("fa + 4096 \t%p\n",first_addr);
 
-    CHECK(mprotect(first_addr, 1024, PROT_NONE),-1, "init_context : mprotect")
+    CHECK(mprotect(last_addr--, pageSize, PROT_NONE),-1, "init_context : mprotect")
+    //CHECK(mprotect(last_addr, pageSize, PROT_NONE),-1, "init_context : mprotect")
 
     th->addr->status = RUNNING;
     th->addr->ctx->uc_link = NULL;

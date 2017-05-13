@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #define CHECK(val, errval, msg) if ((val) == (errval)) {perror(msg); exit(EXIT_FAILURE);}
 
@@ -22,6 +23,9 @@
 #define TO_FREE 2
 #define ALREADY_FREE 1
 #define RUNNING 0
+
+// Segfault
+#define SEGFAULT -1
 
 /*
  * ##############################################################################################
