@@ -6,6 +6,8 @@ enable_testing()
 include (CTest)
 set(CTEST_MEMORYCHECK_COMMAND valgrind )
 set(CTEST_MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full -v" )
+add_custom_target(valgrind
+                   COMMAND ctest -T MemCheck -E timechecker)
 
 # Compilation flags
 set(CMAKE_C_FLAGS "-Wall -g -O0 -lpthread")

@@ -72,12 +72,12 @@ add_test(tst71 test_71_preemption)
 # test_72_preemption
 add_executable(test_72_preemption test_72_preemption.c)
 target_link_libraries (test_72_preemption thread)
-add_test(tst72 test_72_preemption)
+add_test(tst72_timechecker test_72_preemption)
 
 # test_81_priority
 add_executable(test_81_priority test_81_priority.c)
 target_link_libraries (test_81_priority thread)
-add_test(tst81 test_81_priority ${THREAD_PRIORITY})
+add_test(tst81_timechecker test_81_priority ${THREAD_PRIORITY})
 
 # test_91_segfault
 add_executable(test_91_segfault test_91_segfault.c)

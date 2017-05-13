@@ -2,6 +2,11 @@
 #define __THREAD_H__
 
 #ifndef USE_PTHREAD
+
+#ifndef VALGRIND
+#define VALGRIND 0
+#endif
+
 #include <sys/queue.h>
 __attribute__ ((constructor)) void thread_create_main (void);
 __attribute__ ((destructor)) void thread_exit_main (void);
