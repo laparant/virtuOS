@@ -13,21 +13,72 @@ void free_context(thread *th)
 {
     STAILQ_REMOVE(&g_to_free, th, thread, to_free_entries);
     /* Free the resources */
-    VALGRIND_STACK_DEREGISTER(th->addr->valgrind_stackid);
-    free(th->addr->ctx->uc_stack.ss_sp);
-    free(th->addr->ctx);
-    th->addr->status = ALREADY_FREE;
+    VALGRIND_STACK_DEREGISTER(th->valgrind_stackid);
+    free(th->ctx->uc_stack.ss_sp);
+    free(th->ctx);
+    th->status = ALREADY_FREE;
 }
 
 void free_join(thread *th)
 {
-    if (th->addr->status == TO_FREE)
+    if (th->status == TO_FREE)
     {
         free_context(th);
     }
-    free_retval(th->addr->rv);
-    free(th->addr);
+    free_retval(th->rv);
     free(th);
+}
+
+/*
+ * ______________________________________________________________________________________________
+ */
+
+/*
+ * ##############################################################################################
+ * ######                             Priority management                                  ######
+ * ##############################################################################################
+ */
+
+int thread_set_priority(thread_t thread, short priority)
+{
+    /* If priority is not valid, exit */
+    if (priority < 1 || priority > 10)
+    {
+        return EXIT_FAILURE;
+    }
+    else
+    {
+        struct thread *th = (struct thread *) thread;
+        th->priority.value = priority;
+        return EXIT_SUCCESS;
+    }
+}
+
+short thread_get_priority(thread_t thread)
+{
+    struct thread *th = (struct thread *) thread;
+    return th->priority.value;
+}
+
+__useconds_t get_priority_timeslice(thread *th)
+{
+    if (th->priority.value%2 == 1) // priority is an odd value
+    {
+        return TIMESLICE * (th->priority.value/2 + 1);
+    }
+    else // priority is an even value so we need to alternate between higher and lower timeslices
+    {
+        if (th->priority.alternate)
+        {
+            th->priority.alternate = 0;
+            return TIMESLICE * (th->priority.value/2 + 1);
+        }
+        else
+        {
+            th->priority.alternate = 1;
+            return TIMESLICE * (th->priority.value/2);
+        }
+    }
 }
 
 /*
@@ -44,29 +95,25 @@ void reset_timer()
 {
     struct itimerval newtimer;
     CHECK(getitimer(ITIMER_PROF, &newtimer), -1, "reset_timer: getitimer")
-    newtimer.it_value.tv_usec = TIMESLICE;
+    newtimer.it_value.tv_usec = get_priority_timeslice(g_current_thread);
     CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "reset_timer: getitimer")
 }
 
 void enable_interruptions()
 {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGPROF);
     CHECK(sigprocmask(SIG_UNBLOCK, &set, NULL), -1, "enable_interruptions: sigprocmask")
 }
 
 void disable_interruptions()
 {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGPROF);
     CHECK(sigprocmask(SIG_BLOCK, &set, NULL), -1, "disable_interruptions: sigprocmask")
 }
 
 void alarm_handler(int signal)
 {
-    thread_yield();
+    disable_interruptions();
+    if(!STAILQ_EMPTY(&g_runq)) {thread_yield();}
+    enable_interruptions();
 }
 
 /*
@@ -83,6 +130,7 @@ void force_exit(void *(*func)(void *), void *funcarg)
 {
     if (func != NULL)
     {
+        enable_interruptions();
         void *res = func(funcarg);
         thread_exit(res);
     }
@@ -91,7 +139,7 @@ void force_exit(void *(*func)(void *), void *funcarg)
 void finalize_join(thread *th, void **retval)
 {
     /* Collecting the value of retval */
-    if (retval) *retval = get_value(th->addr->rv);
+    if (retval) *retval = get_value(th->rv);
 
     /* If not thread main free the resources */
     if (th != STAILQ_FIRST(&g_all_threads))
@@ -118,20 +166,20 @@ thread *init_context(void *(*func)(void *), void *funcarg)
 
     thread *th = malloc(sizeof(thread));
     CHECK(th, NULL, "init_context: thread pointer malloc")
-    th->addr = malloc(sizeof(thread_base));
-    CHECK(th->addr, NULL, "init_context: thread_base malloc")
-    th->addr->ctx = malloc(sizeof(ucontext_t));
-    CHECK(th->addr->ctx, NULL, "init_context: context malloc")
-    getcontext(th->addr->ctx);
+    th->ctx = malloc(sizeof(ucontext_t));
+    CHECK(th->ctx, NULL, "init_context: context malloc")
+    getcontext(th->ctx);
 
-    th->addr->ctx->uc_stack.ss_size = 64 * pageSize;
-    th->addr->ctx->uc_stack.ss_sp = aligned_alloc(pageSize, th->addr->ctx->uc_stack.ss_size);
-    int valgrind_stackid = VALGRIND_STACK_REGISTER(th->addr->ctx->uc_stack.ss_sp,
-                                                   th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
-    th->addr->valgrind_stackid=valgrind_stackid;
+    th->ctx->uc_stack.ss_size = 64 * pageSize;
+    th->ctx->uc_stack.ss_sp = aligned_alloc(pageSize, th->ctx->uc_stack.ss_size);
+    int valgrind_stackid = VALGRIND_STACK_REGISTER(th->ctx->uc_stack.ss_sp,
+                                                   th->ctx->uc_stack.ss_sp + th->ctx->uc_stack.ss_size);
+    th->valgrind_stackid=valgrind_stackid;
+    th->status = RUNNING;
+    th->ctx->uc_link = NULL;
 
     //void * first_addr = (th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
-    void * last_addr = (th->addr->ctx->uc_stack.ss_sp);
+    void * last_addr = (th->ctx->uc_stack.ss_sp);
     //printf("ss_sp + ss_size \t%p\n", first_addr);
     //printf("ss_sp \t\t%p\n", last_addr);
     //last_addr-=pageSize;
@@ -143,9 +191,7 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     CHECK(mprotect(last_addr--, pageSize, PROT_NONE),-1, "init_context : mprotect")
     //CHECK(mprotect(last_addr, pageSize, PROT_NONE),-1, "init_context : mprotect")
 
-    th->addr->status = RUNNING;
-    th->addr->ctx->uc_link = NULL;
-    makecontext(th->addr->ctx, (void (*)(void)) force_exit, 2, func, funcarg);
+    makecontext(th->ctx, (void (*)(void)) force_exit, 2, func, funcarg);
 
     return th;
 }
@@ -199,17 +245,22 @@ thread_t thread_self(void)
 
 int thread_create(thread_t *newthread, void *(*func)(void *), void *funcarg)
 {
+    disable_interruptions();
     /* Initialization of the context */
     thread *th = init_context(func, funcarg);
 
     /* Initialization of the return value */
-    th->addr->rv = init_retval();
+    th->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    th->addr->joinq = NULL;
+    th->joinq = NULL;
 
     /* Add the thread to the scheduler */
     add_to_scheduler(th);
+
+    /* Give a default priority of 5 */
+    th->priority.value = 5;
+    th->priority.alternate = 0;
 
     /* Giving the return value */
     *newthread = (thread_t) th;
@@ -238,11 +289,10 @@ int thread_yield(void)
     /* Swapping contexes */
     thread *tmp = g_current_thread;
     g_current_thread = new_current;
-    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_yield: swapcontext")
 
     /* Reset the timer for the new thread */
     reset_timer();
-
+    CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_yield: swapcontext")
     enable_interruptions();
 
     return EXIT_SUCCESS;
@@ -257,45 +307,53 @@ int thread_join(thread_t thread, void **retval)
 
     /* Detecting the deadlock (the thread is waiting for me) => error : EDEADLK */
     struct thread *me = thread_self();
-    if (th == me->addr->joinq)
+    if (th == me->joinq)
         return EDEADLK;
 
     /* Detecting if the thread is already joined by another thread */
-    if (th->addr->joinq != NULL)
+    if (th->joinq != NULL)
         return EINVAL;
 
     /* If the thread has already finished */
-    if (th->addr->status != RUNNING)
+    if (th->status != RUNNING)
     {
+        disable_interruptions();
         finalize_join(th, retval);
+        enable_interruptions();
         return EXIT_SUCCESS;
     }
 
     /* If the thread is alive */
     /* Sleeping while the thread hasn't finished */
-    th->addr->joinq = me;
+    disable_interruptions();
+    th->joinq = me;
     struct thread *new_current = STAILQ_FIRST(&g_runq);
     STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
     struct thread *tmp = g_current_thread;
     g_current_thread = new_current;
-    CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_join: swapcontext")
+    reset_timer();
+    CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_join: swapcontext")
+    enable_interruptions();
 
     /* When woke up (thread is finished) */
+    disable_interruptions();
     finalize_join(th, retval);
+    enable_interruptions();
     return EXIT_SUCCESS;
 }
 
 __attribute__ ((__noreturn__)) void thread_exit(void *retval)
 {
+    disable_interruptions();
     thread *me = (thread *) thread_self();
-    me->addr->status = TO_FREE;
+    me->status = TO_FREE;
 
     /* Set the retval */
-    if (retval) me->addr->rv->value = retval;
+    if (retval) me->rv->value = retval;
 
     /* Waking up the thread waiting for me */
-    if (me->addr->joinq != NULL)
-        STAILQ_INSERT_TAIL(&g_runq, me->addr->joinq, runq_entries);
+    if (me->joinq != NULL)
+        STAILQ_INSERT_TAIL(&g_runq, me->joinq, runq_entries);
 
     /* Yielding to next thread if others threads are running*/
     if (!STAILQ_EMPTY(&g_runq))
@@ -315,12 +373,12 @@ __attribute__ ((__noreturn__)) void thread_exit(void *retval)
     if (me != STAILQ_FIRST(&g_all_threads))
     {
         STAILQ_INSERT_TAIL(&g_to_free, me, to_free_entries);
-        CHECK(setcontext(g_current_thread->addr->ctx), -1, "thread_exit: setcontext")
+        CHECK(setcontext(g_current_thread->ctx), -1, "thread_exit: setcontext")
     }
     /* Main */
     else
     {
-        CHECK(swapcontext(me->addr->ctx, g_current_thread->addr->ctx), -1, "thread_exit: swapcontext")
+        CHECK(swapcontext(me->ctx, g_current_thread->ctx), -1, "thread_exit: swapcontext")
     }
     exit(EXIT_SUCCESS);
 }
@@ -341,10 +399,14 @@ __attribute__ ((constructor)) void thread_create_main(void)
     thread *th = init_context(NULL, NULL);
 
     /* Initialization of the return value */
-    th->addr->rv = init_retval();
+    th->rv = init_retval();
 
     /* Initialize the thread's sleep queue */
-    th->addr->joinq = NULL;
+    th->joinq = NULL;
+
+    /* Give a default priority of 5 */
+    th->priority.value = 5;
+    th->priority.alternate = 0;
 
     /* Initialization of the queues */
     STAILQ_INIT(&g_all_threads);
@@ -372,25 +434,28 @@ __attribute__ ((constructor)) void thread_create_main(void)
     timer.it_interval.tv_sec = 0;
     timer.it_interval.tv_usec = TIMESLICE;
     /* Start a virtual timer. It counts down whenever this process is executing */
-    enable_interruptions();
+    sigemptyset(&set);
+    sigaddset(&set, SIGPROF);
     CHECK(setitimer(ITIMER_PROF, &timer, NULL), -1, "thread_create_main: setitimer")
+    enable_interruptions();
 }
 
 __attribute__ ((destructor)) void thread_exit_main(void)
 {
     thread *th;
     thread *me = (thread *) thread_self();
-    if (me->addr->status == RUNNING)
+    if (me->status == RUNNING)
     {
-        me->addr->status = TO_FREE;
+        disable_interruptions();
+        me->status = TO_FREE;
 
         /* Set the retval */
-        //if (retval) me->addr->rv->value = retval;
-        // could not be done because no retval : find a solution
+        //if (retval) me->rv->value = retval;
+        // could not be done because no retval when main just does "return" and we can't use force_exit
 
         /* Waking up the thread waiting for me */
-        if (me->addr->joinq != NULL)
-            STAILQ_INSERT_TAIL(&g_runq, me->addr->joinq, runq_entries);
+        if (me->joinq != NULL)
+            STAILQ_INSERT_TAIL(&g_runq, me->joinq, runq_entries);
 
         /* If others threads are running */
         while (!STAILQ_EMPTY(&g_runq))
@@ -401,8 +466,9 @@ __attribute__ ((destructor)) void thread_exit_main(void)
 
             /* Leaving the runqueue */
             reset_timer();
-            CHECK(swapcontext(me->addr->ctx, new_current->addr->ctx), -1, "thread_exit_main: swapcontext")
+            CHECK(swapcontext(me->ctx, new_current->ctx), -1, "thread_exit_main: swapcontext")
         }
+        enable_interruptions();
     }
 
     disable_interruptions();
@@ -436,11 +502,10 @@ __attribute__ ((destructor)) void thread_exit_main(void)
         th = th2;
     }
 
-    VALGRIND_STACK_DEREGISTER(main_thread->addr->valgrind_stackid);
-    free(main_thread->addr->ctx->uc_stack.ss_sp);
-    free(main_thread->addr->ctx);
-    free_retval(main_thread->addr->rv);
-    free(main_thread->addr);
+    VALGRIND_STACK_DEREGISTER(main_thread->valgrind_stackid);
+    free(main_thread->ctx->uc_stack.ss_sp);
+    free(main_thread->ctx);
+    free_retval(main_thread->rv);
     free(main_thread);
 
     STAILQ_INIT(&g_all_threads);

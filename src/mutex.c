@@ -1,8 +1,6 @@
 #include "thread.h"
 #include "define.h"
 
-#define DESTROYED_MUTEX NULL
-
 int thread_mutex_init(thread_mutex_t *mutex)
 {
     mutex->possessor = NULL;
@@ -24,10 +22,10 @@ int thread_mutex_destroy(thread_mutex_t *mutex)
 int thread_mutex_lock(thread_mutex_t *mutex)
 {
     // Detecting destroyed mutex
-    if (mutex == NULL)
+    if (mutex == DESTROYED_MUTEX)
         return EXIT_FAILURE;
 
-    /* Unvailable mutex : waiting for the mutex */
+    /* Unavailable mutex : waiting for the mutex */
     while (mutex->possessor != NULL)
     {
         thread *me = thread_self();
@@ -36,7 +34,7 @@ int thread_mutex_lock(thread_mutex_t *mutex)
         STAILQ_REMOVE_HEAD(&g_runq, runq_entries);
         thread *tmp = g_current_thread;
         g_current_thread = new_current;
-        CHECK(swapcontext(tmp->addr->ctx, new_current->addr->ctx), -1, "thread_mutex_lock: swapcontext")
+        CHECK(swapcontext(tmp->ctx, new_current->ctx), -1, "thread_mutex_lock: swapcontext")
     }
     /* Available mutex */
     mutex->possessor = thread_self();
@@ -46,7 +44,7 @@ int thread_mutex_lock(thread_mutex_t *mutex)
 int thread_mutex_unlock(thread_mutex_t *mutex)
 {
     // Detecting destroyed mutex
-    if (mutex == NULL)
+    if (mutex == DESTROYED_MUTEX)
         return EXIT_FAILURE;
 
     /* I'm not the possessor */

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
@@ -11,6 +12,7 @@ struct timeval time1;
 struct timeval time2;
 int i;
 int stop = 0;
+short thread1_priority;
 
 void *thread1_func()
 {
@@ -24,7 +26,6 @@ void *thread1_func()
 void *thread2_func()
 {
     long int S = 0;
-    int preempting_time;
     for (i = 0; i < N; i++)
     {
         gettimeofday(&time1, NULL);
@@ -34,22 +35,26 @@ void *thread2_func()
         if (diff_us < 0)
             diff_us = 1000000 + diff_us;
         S += diff_us;
-        printf("%f\n",diff_us);
-        if(i == 0) { preempting_time = diff_us - 12000;} // Calcul de la constante de préemption pour la première itération
     }
     stop = 1;
-    int moy = (int) S/N - preempting_time; // On retire la constante de préemption propre à chaque architecture
-    printf("Timeslice moyenne: %d\n", moy);
-    assert(12000*0.95 < moy && moy < 12000*1.05); // 12000 is the timeslice expected for a normal priority
+    int moy = (int) S/N - 4000; // On retire 4000 car le système préempte
+    printf("Priorité du thread: %u, Timeslice moyenne: %d\n", thread1_priority, moy);
+    //assert(12000*0.95 < moy && moy < 12000*1.05);
     return NULL;
 }
 
 
-int main()
+int main(int argc, char *argv[])
 {
+    if (argc < 2) {
+      printf("argument manquant: priorité du thread\n");
+      return -1;
+    }
     thread_t thread1;
     thread_t thread2;
     thread_create(&thread1, thread1_func, NULL);
+    thread_set_priority(thread1, atoi(argv[1]));
+    thread1_priority = thread_get_priority(thread1);
     thread_create(&thread2, thread2_func, NULL);
     return 0;
 }
