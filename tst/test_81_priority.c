@@ -89,8 +89,7 @@ int main(int argc, char *argv[])
     thread_t thread2;
     err = thread_create(&thread1, thread1_func, NULL);
     assert(!err);
-    err = thread_set_priority(thread1, atoi(argv[1]));
-    assert(!err);
+    thread_set_priority(thread1, atoi(argv[1]));
     thread1_priority = thread_get_priority(thread1);
     thread_create(&thread2, thread2_func, NULL);
 
@@ -133,7 +132,7 @@ int main(int argc, char *argv[])
         wanted_timeslice = 12000; /* Priority of 5 (used if invalid priority) */
         break;
     }
-    assert(wanted_timeslice*0.95 < moy && moy < wanted_timeslice*1.05);
     printf("Priorité du thread: %u\nTimeslice attendue: %d\nTimeslice moyenne: %d\n", thread1_priority, wanted_timeslice, moy);
+    assert(wanted_timeslice*0.95 < moy && moy < wanted_timeslice*1.05);
     return 0;
 }
