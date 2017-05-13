@@ -3,13 +3,12 @@
 #include <time.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <string.h>
 #include "../src/thread.h"
 
-#define SEGFAULT -1 // comme dans define.h
-
 void * recursivity(void* arg) {
-  //printf("%p\n",&arg);
-  return recursivity(NULL);
+    printf("%p\n", &arg);
+    return recursivity(NULL);
 }
 
 int main() {
@@ -18,13 +17,9 @@ int main() {
   assert(!err);
   thread_yield();
 
-  thread_t th2;
-  err = thread_create(&th2, recursivity, NULL);
-  assert(!err);
-
   void *res = NULL;
   err = thread_join(th, res);
-  assert(err == SEGFAULT);
+  assert(strcmp(res,"segfault"));
 
   return 0;
 }

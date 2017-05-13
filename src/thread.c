@@ -122,6 +122,23 @@ void alarm_handler(int signal)
 
 /*
  * ##############################################################################################
+ * ######                           Stack overflow utilitary                               ######
+ * ##############################################################################################
+ */
+
+void segfault_handler(int signal)
+{
+    disable_interruptions();
+    fprintf(stderr,"/!\\ SEGFAULT (stack overflow) /!\\ thread %p\n",(thread *) thread_self());
+    thread_exit(SEGFAULT);
+}
+
+/*
+ * ______________________________________________________________________________________________
+ */
+
+/*
+ * ##############################################################################################
  * ######                            Auxiliary processes                                   ######
  * ##############################################################################################
  */
@@ -170,7 +187,7 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     CHECK(th->ctx, NULL, "init_context: context malloc")
     getcontext(th->ctx);
 
-    th->ctx->uc_stack.ss_size = 64 * pageSize;
+    th->ctx->uc_stack.ss_size = NB_PAGES * pageSize;
     th->ctx->uc_stack.ss_sp = aligned_alloc(pageSize, th->ctx->uc_stack.ss_size);
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->ctx->uc_stack.ss_sp,
                                                    th->ctx->uc_stack.ss_sp + th->ctx->uc_stack.ss_size);
@@ -178,18 +195,10 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     th->status = RUNNING;
     th->ctx->uc_link = NULL;
 
-    //void * first_addr = (th->addr->ctx->uc_stack.ss_sp + th->addr->ctx->uc_stack.ss_size);
+    // Stack overflow
     void * last_addr = (th->ctx->uc_stack.ss_sp);
-    //printf("ss_sp + ss_size \t%p\n", first_addr);
-    //printf("ss_sp \t\t%p\n", last_addr);
-    //last_addr-=pageSize;
-    //printf("ss_sp - 4096 \t%p\n", last_addr);
-
-    //first_addr+=pageSize;
-    //printf("fa + 4096 \t%p\n",first_addr);
-
     CHECK(mprotect(last_addr--, pageSize, PROT_NONE),-1, "init_context : mprotect")
-    //CHECK(mprotect(last_addr, pageSize, PROT_NONE),-1, "init_context : mprotect")
+    printf("Since %p to %p.\n",last_addr,last_addr+pageSize);
 
     makecontext(th->ctx, (void (*)(void)) force_exit, 2, func, funcarg);
 
@@ -416,6 +425,18 @@ __attribute__ ((constructor)) void thread_create_main(void)
     /* Add the thread to the scheduler */
     g_current_thread = th;
     STAILQ_INSERT_HEAD(&g_all_threads, th, all_entries);
+
+    /* ---- Setting up the segfault handler ---- */
+    stack_t ss;
+    CHECK(ss.ss_sp = malloc(SIGSTKSZ),NULL,"thread_create_main : malloc")
+    ss.ss_flags = 0;
+    CHECK(sigaltstack(&ss,NULL),-1,"thread_create_main : sigaltstack")
+
+    struct sigaction segfault_action;
+    memset(&segfault_action, 0, sizeof(segfault_action));
+    segfault_action.sa_handler = &segfault_handler;
+    segfault_action.sa_flags = SA_ONSTACK;
+    CHECK(sigaction(SIGSEGV, &segfault_action, NULL), -1, "thread_create_main: sigaction")
 
     /* ---- Setting up the alarm for preemption ---- */
 
