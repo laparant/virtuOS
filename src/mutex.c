@@ -1,6 +1,11 @@
 #include "thread.h"
 #include "define.h"
 
+/**
+ * @brief thread_mutex_init initializes a mutex
+ * @param mutex the mutex to initialize
+ * @return EXIT_SUCCESS on success
+ */
 int thread_mutex_init(thread_mutex_t *mutex)
 {
     mutex->possessor = NULL;
@@ -8,6 +13,12 @@ int thread_mutex_init(thread_mutex_t *mutex)
     return EXIT_SUCCESS;
 }
 
+/**
+ * @brief thread_mutex_destroy frees the mutex if possible
+ * @param mutex the mutex to free
+ * @return EXIT_FAILURE if the mutex is waited by others threads
+ *         EXIT_SUCCESS on success
+ */
 int thread_mutex_destroy(thread_mutex_t *mutex)
 {
     if (STAILQ_EMPTY(&(mutex->sleep_queue)))
@@ -19,6 +30,12 @@ int thread_mutex_destroy(thread_mutex_t *mutex)
         return EXIT_FAILURE;
 }
 
+/**
+ * @brief thread_mutex_lock locks the mutex for others threads, except the possessor
+ * @param mutex the mutex to lock
+ * @return EXIT_SUCCESS on success
+ *         EXIT FAILURE if the mutex is destroyed
+ */
 int thread_mutex_lock(thread_mutex_t *mutex)
 {
     // Detecting destroyed mutex
@@ -41,6 +58,12 @@ int thread_mutex_lock(thread_mutex_t *mutex)
     return EXIT_SUCCESS;
 }
 
+/**
+ * @brief thread_mutex_unlock unlocks the mutex is the thread is the possessor
+ * @param mutex the mutex to unlock
+ * @return EXIT_FAILURE if the mutex is destroyed or possessed by another thread
+ *         EXIT_SUCCESS on success
+ */
 int thread_mutex_unlock(thread_mutex_t *mutex)
 {
     // Detecting destroyed mutex
