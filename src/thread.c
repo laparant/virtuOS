@@ -1,3 +1,8 @@
+/*!
+ * \file thread.c
+ * \brief contains the main part of the project, i.e the implementation of the interface.
+ */
+
 #include "thread.h"
 
 #ifndef USE_PTHREAD

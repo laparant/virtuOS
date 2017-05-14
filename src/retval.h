@@ -1,9 +1,17 @@
 #ifndef RETVAL_H
 #define RETVAL_H
+/*!
+ * \file retval.h
+ * \brief contains the definitions and utilitaries of the retval structure
+ */
 
+/*!
+ * \struct retval
+ * \brief this structure aims at stocking the return value of a thread
+ */
 struct retval
 {
-    void *value;
+    void *value; /*! value of the return value */
 };
 
 struct retval *init_retval();

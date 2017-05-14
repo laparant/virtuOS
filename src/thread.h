@@ -1,5 +1,9 @@
 #ifndef __THREAD_H__
 #define __THREAD_H__
+/*!
+ * \file thread.h
+ * \brief interface for the thread
+ */
 
 #ifndef USE_PTHREAD
 #include <sys/queue.h>

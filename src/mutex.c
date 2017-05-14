@@ -1,6 +1,11 @@
 #include "thread.h"
 #include "define.h"
 
+/*!
+ * \file mutex.c
+ * \brief implementation of mutex
+ */
+
 #define DESTROYED_MUTEX NULL
 
 int thread_mutex_init(thread_mutex_t *mutex)
