@@ -84,14 +84,45 @@ extern int thread_join(thread_t thread, void **retval);
 extern void thread_exit(void *retval) __attribute__ ((__noreturn__));
 
 /* Interface possible pour les mutex */
+/*!
+ * \struct thread_mutex
+ */
 typedef struct thread_mutex
 {
     thread_t possessor;
     STAILQ_HEAD(thread_list_mutex, thread) sleep_queue;
 } thread_mutex_t;
+
+/*!
+ * \brief initiate a mutex
+ * \fn int thread_mutex_init(thread_mutex_t *mutex)
+ * \param mutex
+ * \return
+ */
 int thread_mutex_init(thread_mutex_t *mutex);
+
+/*!
+ * \brief
+ * \fn int thread_mutex_destroy(thread_mutex_t *mutex)
+ * \param mutex
+ * \return
+ */
 int thread_mutex_destroy(thread_mutex_t *mutex);
+
+/*!
+ * \brief
+ * \fn int thread_mutex_lock(thread_mutex_t *mutex)
+ * \param mutex
+ * \return
+ */
 int thread_mutex_lock(thread_mutex_t *mutex);
+
+/*!
+ * \brief
+ * \fn int thread_mutex_unlock(thread_mutex_t *mutex)
+ * \param mutex
+ * \return
+ */
 int thread_mutex_unlock(thread_mutex_t *mutex);
 
 /* Fonction permettant à l'utilisateur de paramétrer la priorité d'un thread
