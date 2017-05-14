@@ -14,7 +14,7 @@ void free_context(thread *th)
     STAILQ_REMOVE(&g_to_free, th, thread, to_free_entries);
     /* Free the resources */
     VALGRIND_STACK_DEREGISTER(th->valgrind_stackid);
-    CHECK(mprotect(th->ctx->uc_stack.ss_sp, 2*PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC),-1, "init_context : mprotect")
+    CHECK(mprotect(th->ctx->uc_stack.ss_sp, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC), -1, "init_context: mprotect")
     free(th->ctx->uc_stack.ss_sp);
     free(th->ctx);
     th->status = ALREADY_FREE;
@@ -40,7 +40,7 @@ void free_join(thread *th)
  * ##############################################################################################
  */
 
-int thread_set_priority(thread_t thread, short priority)
+int thread_set_priority(thread_t thread, unsigned short priority)
 {
     /* If priority is not valid, exit */
     if (priority < 1 || priority > 10)
@@ -55,7 +55,7 @@ int thread_set_priority(thread_t thread, short priority)
     }
 }
 
-short thread_get_priority(thread_t thread)
+unsigned short thread_get_priority(thread_t thread)
 {
     struct thread *th = (struct thread *) thread;
     return th->priority.value;
@@ -113,7 +113,7 @@ void disable_interruptions()
 void alarm_handler(int signal)
 {
     disable_interruptions();
-    if(!STAILQ_EMPTY(&g_runq)) {thread_yield();}
+    if (!STAILQ_EMPTY(&g_runq)) {thread_yield();}
     enable_interruptions();
 }
 
@@ -129,12 +129,13 @@ void alarm_handler(int signal)
 
 void stack_overflow()
 {
-    thread * th = (thread *) thread_self();
-    CHECK(mprotect(th->ctx->uc_stack.ss_sp, 2*PAGE_SIZE, PROT_NONE),-1, "init_context : mprotect")
+    thread *th = (thread *) thread_self();
+    CHECK(mprotect(th->ctx->uc_stack.ss_sp, 2 * PAGE_SIZE, PROT_NONE), -1, "init_context: mprotect")
 }
 
-void sigsegv_handler(int signum, siginfo_t *info, void *data) {
-    printf("/!\\ SEGFAULT (stack overflow) /!\\ thread %p\n",(thread *) thread_self());
+void sigsegv_handler(int signum, siginfo_t *info, void *data)
+{
+    printf("/!\\ SEGFAULT (stack overflow) /!\\ thread %p\n", (thread *) thread_self());
     thread_exit(SEGFAULT);
 }
 
@@ -195,7 +196,7 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     th->ctx->uc_stack.ss_sp = valloc(th->ctx->uc_stack.ss_size);
     int valgrind_stackid = VALGRIND_STACK_REGISTER(th->ctx->uc_stack.ss_sp,
                                                    th->ctx->uc_stack.ss_sp + th->ctx->uc_stack.ss_size);
-    th->valgrind_stackid=valgrind_stackid;
+    th->valgrind_stackid = valgrind_stackid;
     th->status = RUNNING;
     th->ctx->uc_link = NULL;
 
@@ -430,11 +431,11 @@ __attribute__ ((constructor)) void thread_create_main(void)
     segv_stack.ss_flags = 0;
     segv_stack.ss_size = SIGSTKSZ;
     sigaltstack(&segv_stack, NULL);
-    mprotect(segv_stack.ss_sp,SIGSTKSZ,PROT_READ|PROT_WRITE|PROT_EXEC);
+    mprotect(segv_stack.ss_sp, SIGSTKSZ, PROT_READ | PROT_WRITE | PROT_EXEC);
 
     struct sigaction action;
     bzero(&action, sizeof(action));
-    action.sa_flags = SA_SIGINFO|SA_STACK;
+    action.sa_flags = SA_SIGINFO | SA_STACK;
     action.sa_sigaction = &sigsegv_handler;
     sigaction(SIGSEGV, &action, NULL);
 
