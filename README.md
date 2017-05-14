@@ -75,3 +75,12 @@ gnuplot> set xlabel "Number"
 gnuplot> set ylabel "Time (seconds)"
 gnuplot> plot "fibo_thread.dat" title "Fibonacci with our library" with linespoints, "fibo_pthread.dat" title "Fibonnaci with pthread" with linespoints
 ```
+
+##Documentation
+Doxygen has been used to generate automatic documentation. In the repertory `doc/` is a `Doxyfile.in` you can modify if you want to generate LaTex documentation. Only html documentation is enable yet. To generate documentation and see it (from the root of the project):
+```
+$> cd build/
+$> make doc
+$> firefox doc/html/index.html
+```
+
