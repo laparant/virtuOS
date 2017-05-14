@@ -131,10 +131,23 @@ int thread_mutex_unlock(thread_mutex_t *mutex);
  * -> plus la priorité est élevée, plus la timeslice sera grande
  * retourne 0 en cas de succès, 1 si la priorité n'est pas valide
  */
-extern int thread_set_priority(thread_t thread, short priority);
+/*!
+ * \brief thread_set_priority allows the user to give a specific priority to a thread. The default priority is 5.
+ * \param thread is the thread whose priority you want to change.
+ * \param priority is an integer between 1 and 10. The priority of a thread affects its timeslice, ie the higher the priority,
+ * the more time the thread will have to execute. If the value given is not valid, the priority is not changed and the user is
+ * notified by the return value.
+ * \return 0 on success, 1 if the priority given is not valid.
+ */
+extern int thread_set_priority(thread_t thread, unsigned short priority);
 
 /* Retourne la valeur actuelle de la priorité du thread */
-extern short thread_get_priority(thread_t thread);
+/*!
+ * \brief thread_get_priority returns the current priority of a thread.
+ * \param thread is the thread whose priority you want to know.
+ * \return a value between 1 and 10.
+ */
+extern unsigned short thread_get_priority(thread_t thread);
 
 #else /* USE_PTHREAD */
 

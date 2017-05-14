@@ -46,8 +46,8 @@
  */
 typedef struct priority_t
 {
-    short value; // Between 1 and 10, timeslice between 4ms and 22ms
-    short alternate;
+    unsigned short value; // Between 1 and 10, timeslice between 4ms and 22ms
+    unsigned short alternate; // Boolean to tell if the next value should be higher or lower
 } priority_t;
 
 
