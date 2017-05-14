@@ -66,7 +66,7 @@ typedef struct thread_base
     thread *joinq; /*!< thread waiting to be joined */
     struct retval *rv; /*!< return value of the thread after finishing */
     ucontext_t *ctx; /*!< execution context */
-    int valgrind_stackid; /*!< nobody knew valgrind could be so complicated */
+    int valgrind_stackid; /*!< for tracking */
     int status; /*!< status of the thread; see macros above */
     priority_t priority;
 } thread_base;

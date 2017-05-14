@@ -9,6 +9,11 @@
  * ######                             Cleaning processes                                   ######
  * ##############################################################################################
  */
+/*!
+ * \brief frees context of a thread.
+ * \fn void free_context(thread *th)
+ * \param th thread
+ */
 void free_context(thread *th)
 {
     STAILQ_REMOVE(&g_to_free, th, thread, to_free_entries);
@@ -19,6 +24,11 @@ void free_context(thread *th)
     th->addr->status = ALREADY_FREE;
 }
 
+/*!
+ * \brief frees all the remaining resources of a thread in thread_join
+ * \fn void free_join(thread *th)
+ * \param th thread
+ */
 void free_join(thread *th)
 {
     if (th->addr->status == TO_FREE)
@@ -40,6 +50,13 @@ void free_join(thread *th)
  * ##############################################################################################
  */
 
+/*!
+ * \brief
+ * \fn int thread_set_priority(thread_t thread, short priority)
+ * \param thread
+ * \param priority
+ * \return EXIT_FAILURE on failure, EXIT_SUCCESS otherwise
+ */
 int thread_set_priority(thread_t thread, short priority)
 {
     /* If priority is not valid, exit */
@@ -55,12 +72,24 @@ int thread_set_priority(thread_t thread, short priority)
     }
 }
 
+/*!
+ * \brief
+ * \fn short thread_get_priority(thread_t thread)
+ * \param thread
+ * \return
+ */
 short thread_get_priority(thread_t thread)
 {
     struct thread *th = (struct thread *) thread;
     return th->addr->priority.value;
 }
 
+/*!
+ * \brief
+ * \fn __useconds_t get_priority_timeslice(thread *th)
+ * \param th
+ * \return
+ */
 __useconds_t get_priority_timeslice(thread *th)
 {
     if (th->addr->priority.value%2 == 1) // priority is an odd value
@@ -92,6 +121,9 @@ __useconds_t get_priority_timeslice(thread *th)
  * ##############################################################################################
  */
 
+/*!
+ * \brief reset_timer resets the current timer in order to count to the next interruption
+ */
 void reset_timer()
 {
     struct itimerval newtimer;
@@ -100,6 +132,9 @@ void reset_timer()
     CHECK(setitimer(ITIMER_PROF, &newtimer, NULL), -1, "reset_timer: getitimer")
 }
 
+/*!
+ * \brief enable_interruptions
+ */
 void enable_interruptions()
 {
     sigset_t set;
@@ -108,6 +143,9 @@ void enable_interruptions()
     CHECK(sigprocmask(SIG_UNBLOCK, &set, NULL), -1, "enable_interruptions: sigprocmask")
 }
 
+/*!
+ * \brief disable_interruptions
+ */
 void disable_interruptions()
 {
     sigset_t set;
@@ -116,6 +154,10 @@ void disable_interruptions()
     CHECK(sigprocmask(SIG_BLOCK, &set, NULL), -1, "disable_interruptions: sigprocmask")
 }
 
+/*!
+ * \brief alarm_handler
+ * \param signal
+ */
 void alarm_handler(int signal)
 {
     thread_yield();
@@ -131,6 +173,10 @@ void alarm_handler(int signal)
  * ##############################################################################################
  */
 
+/*!
+ * \brief force_exit
+ * \param funcarg
+ */
 void force_exit(void *(*func)(void *), void *funcarg)
 {
     if (func != NULL)
@@ -140,6 +186,11 @@ void force_exit(void *(*func)(void *), void *funcarg)
     }
 }
 
+/*!
+ * \brief finalize_join
+ * \param th
+ * \param retval
+ */
 void finalize_join(thread *th, void **retval)
 {
     /* Collecting the value of retval */
@@ -164,6 +215,11 @@ void finalize_join(thread *th, void **retval)
  * ##############################################################################################
  */
 
+/*!
+ * \brief init_context
+ * \param funcarg
+ * \return
+ */
 thread *init_context(void *(*func)(void *), void *funcarg)
 {
     thread *th = malloc(sizeof(thread));
@@ -186,6 +242,10 @@ thread *init_context(void *(*func)(void *), void *funcarg)
     return th;
 }
 
+/*!
+ * \brief add_to_scheduler
+ * \param th
+ */
 void add_to_scheduler(thread *th)
 {
     /* Insert the current thread in the run queue */

@@ -12,7 +12,6 @@ struct retval *init_retval();
  * @fn      free_retval
  * @brief   frees the memory m'allocated for struct retval
  * @param   pointer to retval
- * TODO     set the pointer to null after the call of free_retval
  */
 void free_retval(struct retval *rv);
 
